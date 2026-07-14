@@ -2,26 +2,26 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
-const BANCOS_CHILE = [
-  'Banco de Chile', 'Santander', 'BCI', 'Banco Estado',
-  'Scotiabank', 'Itaú', 'Falabella', 'Ripley',
-  'Mach', 'Tenpo', 'Mercado Pago', 'Otro'
-]
-
 export default function Cuentas() {
   const [cuentas, setCuentas] = useState([])
+  const [bancos, setBancos] = useState([])
   const [mostrarForm, setMostrarForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
     nombre: '',
     banco: '',
-    tipo: 'corriente',
-    email_origen: ''
+    tipo: 'corriente'
   })
 
   useEffect(() => {
     cargarCuentas()
+    cargarBancos()
   }, [])
+
+  const cargarBancos = async () => {
+    const { data } = await supabase.from('bancos').select('*').order('nombre')
+    setBancos(data || [])
+  }
 
   const cargarCuentas = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -41,13 +41,21 @@ export default function Cuentas() {
 
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Obtener todos los emails del banco seleccionado
+    const bancoSeleccionado = bancos.find(b => b.nombre === form.banco)
+    const emailsArray = bancoSeleccionado?.emails ? JSON.parse(bancoSeleccionado.emails) : []
+
     const { error } = await supabase.from('cuentas').insert({
-      ...form,
-      user_id: user.id
+      nombre: form.nombre,
+      banco: form.banco,
+      tipo: form.tipo,
+      emails: emailsArray,
+      user_id: user.id,
+      activa: true
     })
 
     if (!error) {
-      setForm({ nombre: '', banco: '', tipo: 'corriente', email_origen: '' })
+      setForm({ nombre: '', banco: '', tipo: 'corriente' })
       setMostrarForm(false)
       cargarCuentas()
     }
@@ -106,8 +114,8 @@ export default function Cuentas() {
                   className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecciona un banco</option>
-                  {BANCOS_CHILE.map(b => (
-                    <option key={b} value={b}>{b}</option>
+                  {bancos.map(b => (
+                    <option key={b.id} value={b.nombre}>{b.nombre}</option>
                   ))}
                 </select>
               </div>
@@ -124,17 +132,6 @@ export default function Cuentas() {
                   <option value="debito">Tarjeta de débito</option>
                   <option value="prepago">Tarjeta prepago</option>
                 </select>
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">
-                  Correo del banco <span className="text-gray-600">(opcional)</span>
-                </label>
-                <input
-                  placeholder="Ej: notificaciones@bci.cl"
-                  value={form.email_origen}
-                  onChange={e => setForm({...form, email_origen: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                />
               </div>
             </div>
             <div className="flex gap-3 mt-4">
@@ -170,9 +167,6 @@ export default function Cuentas() {
                     <h3 className="font-semibold text-lg">{cuenta.nombre}</h3>
                     <p className="text-blue-400 mt-1">{cuenta.banco}</p>
                     <p className="text-gray-400 text-sm mt-1 capitalize">{cuenta.tipo}</p>
-                    {cuenta.email_origen && (
-                      <p className="text-gray-600 text-xs mt-2">{cuenta.email_origen}</p>
-                    )}
                   </div>
                   <button
                     onClick={() => eliminarCuenta(cuenta.id)}
