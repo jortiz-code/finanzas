@@ -41,7 +41,6 @@ export default function Cuentas() {
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Obtener todos los emails del banco seleccionado
     const bancoSeleccionado = bancos.find(b => b.nombre === form.banco)
     const emailsArray = bancoSeleccionado?.emails ? JSON.parse(bancoSeleccionado.emails) : []
 
@@ -68,24 +67,24 @@ export default function Cuentas() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-8">
+    <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
 
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 lg:mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Mis Cuentas</h1>
-            <p className="text-gray-400 mt-1">Administra tus bancos y tarjetas</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">Mis Cuentas</h1>
+            <p className="text-gray-400 mt-1 text-sm sm:text-base">Administra tus bancos y tarjetas</p>
           </div>
           <div className="flex gap-3">
             <button
               onClick={() => window.location.href = '/dashboard'}
-              className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-xl transition"
+              className="flex-1 sm:flex-none bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-xl transition text-sm sm:text-base"
             >
               ← Volver
             </button>
             <button
               onClick={() => setMostrarForm(!mostrarForm)}
-              className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl transition"
+              className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl transition text-sm sm:text-base whitespace-nowrap"
             >
               + Agregar cuenta
             </button>
@@ -94,8 +93,8 @@ export default function Cuentas() {
 
         {/* Formulario */}
         {mostrarForm && (
-          <div className="bg-gray-900 rounded-2xl p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Nueva cuenta</h2>
+          <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">Nueva cuenta</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-gray-400 text-sm mb-1 block">Nombre de la cuenta</label>
@@ -103,7 +102,7 @@ export default function Cuentas() {
                   placeholder="Ej: Cuenta corriente BCI"
                   value={form.nombre}
                   onChange={e => setForm({...form, nombre: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 />
               </div>
               <div>
@@ -111,7 +110,7 @@ export default function Cuentas() {
                 <select
                   value={form.banco}
                   onChange={e => setForm({...form, banco: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 >
                   <option value="">Selecciona un banco</option>
                   {bancos.map(b => (
@@ -124,7 +123,7 @@ export default function Cuentas() {
                 <select
                   value={form.tipo}
                   onChange={e => setForm({...form, tipo: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 >
                   <option value="corriente">Cuenta corriente</option>
                   <option value="vista">Cuenta vista</option>
@@ -134,7 +133,7 @@ export default function Cuentas() {
                 </select>
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <button
                 onClick={agregarCuenta}
                 disabled={loading}
@@ -154,23 +153,23 @@ export default function Cuentas() {
 
         {/* Lista de cuentas */}
         {cuentas.length === 0 ? (
-          <div className="bg-gray-900 rounded-2xl p-12 text-center">
+          <div className="bg-gray-900 rounded-2xl p-8 sm:p-12 text-center">
             <p className="text-4xl mb-4">🏦</p>
             <p className="text-gray-400">No tienes cuentas agregadas aún</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {cuentas.map(cuenta => (
-              <div key={cuenta.id} className="bg-gray-900 rounded-2xl p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-lg">{cuenta.nombre}</h3>
-                    <p className="text-blue-400 mt-1">{cuenta.banco}</p>
+              <div key={cuenta.id} className="bg-gray-900 rounded-2xl p-5 sm:p-6">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-base sm:text-lg truncate">{cuenta.nombre}</h3>
+                    <p className="text-blue-400 mt-1 truncate">{cuenta.banco}</p>
                     <p className="text-gray-400 text-sm mt-1 capitalize">{cuenta.tipo}</p>
                   </div>
                   <button
                     onClick={() => eliminarCuenta(cuenta.id)}
-                    className="text-gray-600 hover:text-red-400 transition text-xl"
+                    className="text-gray-600 hover:text-red-400 transition text-xl flex-shrink-0"
                   >
                     ×
                   </button>
