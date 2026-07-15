@@ -407,6 +407,7 @@ export default function Dashboard() {
   const navItems = [
     { path: '/dashboard', icon: '📊', title: 'Dashboard' },
     { path: '/dashboard/cuentas', icon: '💳', title: 'Cuentas' },
+    { path: '/dashboard/categorias', icon: '⚙️', title: 'Configuración' },
     { path: '/dashboard/transacciones', icon: '💸', title: 'Transacciones' },
     { path: '/dashboard/reportes', icon: '📈', title: 'Reportes' },
     { path: '/dashboard/presupuestos', icon: '🎯', title: 'Presupuestos' },
