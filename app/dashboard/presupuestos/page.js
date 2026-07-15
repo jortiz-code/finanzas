@@ -138,37 +138,37 @@ export default function Presupuestos() {
   const mesNombre = new Date().toLocaleString('es-CL', { month: 'long', year: 'numeric' })
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-8">
+    <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
 
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 lg:mb-8">
           <div>
-            <h1 className="text-3xl font-bold">🎯 Presupuestos</h1>
-            <p className="text-gray-400 mt-1 capitalize">{mesNombre}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">🎯 Presupuestos</h1>
+            <p className="text-gray-400 mt-1 capitalize text-sm sm:text-base">{mesNombre}</p>
           </div>
-          <div className="flex gap-3 flex-wrap justify-end">
+          <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-3 sm:flex-wrap sm:justify-end">
             <button
               onClick={() => window.location.href = '/dashboard'}
-              className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-xl transition"
+              className="bg-gray-800 hover:bg-gray-700 px-3 sm:px-4 py-2 rounded-xl transition text-sm sm:text-base"
             >
               ← Volver
             </button>
             <button
               onClick={verificarPresupuestos}
-              className="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded-xl transition"
+              className="bg-yellow-600 hover:bg-yellow-500 px-3 sm:px-4 py-2 rounded-xl transition text-sm sm:text-base"
             >
-              🔔 Verificar alertas
+              🔔 Alertas
             </button>
             <button
               onClick={generarConIA}
               disabled={generando}
-              className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-xl transition disabled:opacity-50"
+              className="bg-purple-600 hover:bg-purple-500 px-3 sm:px-4 py-2 rounded-xl transition disabled:opacity-50 text-sm sm:text-base whitespace-nowrap"
             >
-              {generando ? '🤖 Generando...' : '🤖 Sugerir con IA'}
+              {generando ? '🤖 Generando...' : '🤖 Sugerir IA'}
             </button>
             <button
               onClick={() => setMostrarForm(!mostrarForm)}
-              className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl transition"
+              className="bg-blue-600 hover:bg-blue-500 px-3 sm:px-4 py-2 rounded-xl transition text-sm sm:text-base"
             >
               + Agregar
             </button>
@@ -176,16 +176,16 @@ export default function Presupuestos() {
         </div>
 
         {/* Selector personal / empresarial */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           <button
             onClick={() => setVistaActual('personal')}
-            className={`px-4 py-2 rounded-xl transition ${vistaActual === 'personal' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+            className={`px-4 py-2 rounded-xl transition whitespace-nowrap text-sm sm:text-base ${vistaActual === 'personal' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
           >
             👤 Personal
           </button>
           <button
             onClick={() => setVistaActual('empresarial')}
-            className={`px-4 py-2 rounded-xl transition ${vistaActual === 'empresarial' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+            className={`px-4 py-2 rounded-xl transition whitespace-nowrap text-sm sm:text-base ${vistaActual === 'empresarial' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
           >
             🏢 Empresarial
           </button>
@@ -193,15 +193,15 @@ export default function Presupuestos() {
 
         {/* Formulario */}
         {mostrarForm && (
-          <div className="bg-gray-900 rounded-2xl p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Nuevo presupuesto</h2>
+          <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">Nuevo presupuesto</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-gray-400 text-sm mb-1 block">Tipo</label>
                 <select
                   value={form.tipo}
                   onChange={e => setForm({...form, tipo: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 >
                   <option value="personal">Personal</option>
                   <option value="empresarial">Empresarial</option>
@@ -212,7 +212,7 @@ export default function Presupuestos() {
                 <select
                   value={form.categoria_id}
                   onChange={e => setForm({...form, categoria_id: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 >
                   <option value="">Selecciona categoría</option>
                   {categorias.filter(c => c.tipo === form.tipo).map(c => (
@@ -227,11 +227,11 @@ export default function Presupuestos() {
                   placeholder="Ej: 200000"
                   value={form.monto}
                   onChange={e => setForm({...form, monto: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 />
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <button
                 onClick={agregarPresupuesto}
                 className="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-xl transition"
@@ -252,10 +252,10 @@ export default function Presupuestos() {
         {loading ? (
           <div className="text-center text-gray-400 py-12">Cargando...</div>
         ) : presupuestosFiltrados.length === 0 ? (
-          <div className="bg-gray-900 rounded-2xl p-12 text-center">
+          <div className="bg-gray-900 rounded-2xl p-8 sm:p-12 text-center">
             <p className="text-4xl mb-4">🎯</p>
-            <p className="text-white font-semibold text-xl">Sin presupuestos</p>
-            <p className="text-gray-400 mt-2">Agrega uno manualmente o usa la IA para sugerirlos</p>
+            <p className="text-white font-semibold text-lg sm:text-xl">Sin presupuestos</p>
+            <p className="text-gray-400 mt-2 text-sm sm:text-base">Agrega uno manualmente o usa la IA para sugerirlos</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -265,24 +265,24 @@ export default function Presupuestos() {
               const sobrepasado = gastado > p.monto
 
               return (
-                <div key={p.id} className="bg-gray-900 rounded-2xl p-6">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{p.categorias?.icono}</span>
-                      <div>
-                        <p className="font-semibold">{p.categorias?.nombre}</p>
-                        <p className="text-gray-400 text-sm">
+                <div key={p.id} className="bg-gray-900 rounded-2xl p-4 sm:p-6">
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-2xl flex-shrink-0">{p.categorias?.icono}</span>
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate">{p.categorias?.nombre}</p>
+                        <p className="text-gray-400 text-xs sm:text-sm truncate">
                           {formatMonto(gastado)} de {formatMonto(p.monto)}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <p className={`font-bold ${sobrepasado ? 'text-red-400' : porcentaje > 80 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                      <p className={`font-bold text-sm sm:text-base whitespace-nowrap ${sobrepasado ? 'text-red-400' : porcentaje > 80 ? 'text-yellow-400' : 'text-green-400'}`}>
                         {sobrepasado ? '⚠️ ' : ''}{Math.round(porcentaje)}%
                       </p>
                       <button
                         onClick={() => eliminarPresupuesto(p.id)}
-                        className="text-gray-600 hover:text-red-400 transition"
+                        className="text-gray-600 hover:text-red-400 transition text-lg"
                       >
                         ×
                       </button>
@@ -298,7 +298,7 @@ export default function Presupuestos() {
                   </div>
 
                   {sobrepasado && (
-                    <p className="text-red-400 text-sm mt-2">
+                    <p className="text-red-400 text-xs sm:text-sm mt-2">
                       ⚠️ Sobrepasaste el presupuesto por {formatMonto(gastado - p.monto)}
                     </p>
                   )}
