@@ -12,6 +12,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
@@ -49,9 +51,9 @@ export async function GET(request) {
     console.log('Resultado Supabase:', data)
     console.log('Error Supabase:', error)
 
-    return Response.redirect('http://localhost:3000/dashboard?gmail=conectado')
+    return Response.redirect(`${APP_URL}/dashboard/configuracion?gmail=conectado`)
   } catch (error) {
     console.error('Error completo:', error.message)
-    return Response.redirect('http://localhost:3000/dashboard?gmail=error')
+    return Response.redirect(`${APP_URL}/dashboard/configuracion?gmail=error`)
   }
 }
