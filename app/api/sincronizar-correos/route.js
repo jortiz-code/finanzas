@@ -34,10 +34,30 @@ export async function POST(request) {
       .select('*')
       .eq('user_id', user_id)
 
+    // La columna `emails` puede venir como string JSON (texto) o como array real (jsonb),
+    // dependiendo del tipo de columna en Supabase. Normalizamos siempre a array.
+    const parsearEmails = (valor) => {
+      if (Array.isArray(valor)) return valor
+      if (typeof valor === 'string' && valor.trim().startsWith('[')) {
+        try {
+          const parsed = JSON.parse(valor)
+          return Array.isArray(parsed) ? parsed : []
+        } catch (e) {
+          return []
+        }
+      }
+      return []
+    }
+
+    const cuentasNormalizadas = (todasLasCuentas || []).map(c => ({
+      ...c,
+      emailsArray: parsearEmails(c.emails)
+    }))
+
     // Filtramos en JS las cuentas que tengan al menos un email configurado,
     // ya sea en el array `emails` (flujo nuevo) o en `email_origen` (flujo antiguo)
-    const cuentas = (todasLasCuentas || []).filter(c => {
-      const tieneEmails = Array.isArray(c.emails) && c.emails.length > 0
+    const cuentas = cuentasNormalizadas.filter(c => {
+      const tieneEmails = c.emailsArray.length > 0
       const tieneEmailOrigen = !!c.email_origen
       return tieneEmails || tieneEmailOrigen
     })
@@ -62,10 +82,8 @@ export async function POST(request) {
     // Juntamos todos los correos posibles de todas las cuentas (array emails + email_origen legacy)
     const todosLosEmails = []
     for (const c of cuentas) {
-      if (Array.isArray(c.emails)) {
-        for (const e of c.emails) {
-          if (e) todosLosEmails.push(e)
-        }
+      for (const e of c.emailsArray) {
+        if (e) todosLosEmails.push(e)
       }
       if (c.email_origen) {
         todosLosEmails.push(c.email_origen)
@@ -175,8 +193,7 @@ REGLAS:
 
         // Match de cuenta: revisa tanto el array emails como email_origen (legacy)
         const cuentaMatch = cuentas.find(c => {
-          const emailsDeCuenta = []
-          if (Array.isArray(c.emails)) emailsDeCuenta.push(...c.emails)
+          const emailsDeCuenta = [...c.emailsArray]
           if (c.email_origen) emailsDeCuenta.push(c.email_origen)
 
           return emailsDeCuenta.some(e =>
