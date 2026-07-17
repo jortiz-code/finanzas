@@ -11,6 +11,56 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 })
 
+// Extrae el texto de un correo, soportando estructuras anidadas (multipart/alternative
+// dentro de multipart/mixed, etc). Prioriza texto plano; si no existe, usa el HTML
+// y le quita las etiquetas.
+function extraerTextoCorreo(payload) {
+  let textoPlano = ''
+  let textoHtml = ''
+
+  function recorrer(part) {
+    if (!part) return
+    if (part.mimeType === 'text/plain' && part.body?.data) {
+      textoPlano += Buffer.from(part.body.data, 'base64').toString('utf-8')
+    } else if (part.mimeType === 'text/html' && part.body?.data) {
+      textoHtml += Buffer.from(part.body.data, 'base64').toString('utf-8')
+    } else if (part.parts) {
+      for (const sub of part.parts) recorrer(sub)
+    }
+  }
+
+  if (payload.parts) {
+    for (const part of payload.parts) recorrer(part)
+  } else if (payload.body?.data) {
+    if (payload.mimeType === 'text/html') {
+      textoHtml = Buffer.from(payload.body.data, 'base64').toString('utf-8')
+    } else {
+      textoPlano = Buffer.from(payload.body.data, 'base64').toString('utf-8')
+    }
+  }
+
+  if (textoPlano.trim()) return textoPlano
+
+  if (textoHtml.trim()) {
+    return textoHtml
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&aacute;/g, 'á')
+      .replace(/&eacute;/g, 'é')
+      .replace(/&iacute;/g, 'í')
+      .replace(/&oacute;/g, 'ó')
+      .replace(/&uacute;/g, 'ú')
+      .replace(/&ntilde;/g, 'ñ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  return ''
+}
+
 export async function POST(request) {
   try {
     const { user_id } = await request.json()
@@ -128,22 +178,11 @@ export async function POST(request) {
           format: 'full'
         })
 
-        let texto = ''
-        const payload = correo.payload
-
-        if (payload.body?.data) {
-          texto = Buffer.from(payload.body.data, 'base64').toString('utf-8')
-        } else if (payload.parts) {
-          for (const part of payload.parts) {
-            if (part.mimeType === 'text/plain' && part.body?.data) {
-              texto += Buffer.from(part.body.data, 'base64').toString('utf-8')
-            }
-          }
-        }
+        const texto = extraerTextoCorreo(correo.payload)
 
         if (!texto) continue
 
-        const remitente = payload.headers?.find(h => h.name === 'From')?.value || ''
+        const remitente = correo.payload.headers?.find(h => h.name === 'From')?.value || ''
 
         const { data: existente } = await supabase
           .from('transacciones')
