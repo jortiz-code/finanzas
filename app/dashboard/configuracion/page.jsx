@@ -5,15 +5,19 @@ import { supabase } from '@/lib/supabase'
 export default function Configuracion() {
   const [usuario, setUsuario] = useState(null)
   const [conexion, setConexion] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loadingGmail, setLoadingGmail] = useState(true)
   const [sincronizando, setSincronizando] = useState(false)
   const [resultadoSync, setResultadoSync] = useState(null)
 
+  const [rut, setRut] = useState('')
+  const [guardado, setGuardado] = useState(false)
+  const [loading, setLoading] = useState(false)
+
   useEffect(() => {
-    cargarDatos()
+    cargarTodo()
   }, [])
 
-  const cargarDatos = async () => {
+  const cargarTodo = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return window.location.href = '/auth'
     setUsuario(user)
@@ -25,11 +29,21 @@ export default function Configuracion() {
       .eq('proveedor', 'gmail')
       .eq('activa', true)
       .single()
-
     setConexion(conex || null)
-    setLoading(false)
+    setLoadingGmail(false)
+
+    const { data } = await supabase
+      .from('configuracion_usuarios')
+      .select('cartola_password')
+      .eq('user_id', user.id)
+      .single()
+
+    if (data?.cartola_password) {
+      setGuardado(true)
+    }
   }
 
+  // --- Gmail ---
   const conectarGmail = () => {
     if (!usuario) return
     window.location.href = `/api/auth/google?user_id=${usuario.id}`
@@ -42,7 +56,7 @@ export default function Configuracion() {
       .update({ activa: false })
       .eq('user_id', usuario.id)
       .eq('proveedor', 'gmail')
-    cargarDatos()
+    cargarTodo()
   }
 
   const sincronizarAhora = async () => {
@@ -62,11 +76,39 @@ export default function Configuracion() {
     setSincronizando(false)
   }
 
-  if (loading) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <p className="text-white text-xl">Cargando...</p>
-    </div>
-  )
+  // --- RUT / cartola password ---
+  const extraerUltimos4 = (rutValor) => {
+    const limpio = rutValor.replace(/\D/g, '')
+    return limpio.slice(-4)
+  }
+
+  const guardarRut = async () => {
+    if (!rut) return
+
+    const password = extraerUltimos4(rut)
+    if (password.length !== 4) {
+      alert('RUT inválido')
+      return
+    }
+
+    setLoading(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { error } = await supabase
+      .from('configuracion_usuarios')
+      .upsert({
+        user_id: user.id,
+        cartola_password: password
+      }, { onConflict: 'user_id' })
+
+    if (!error) {
+      setGuardado(true)
+      setRut('')
+    }
+
+    setLoading(false)
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6 lg:p-8">
@@ -75,7 +117,7 @@ export default function Configuracion() {
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 lg:mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">⚙️ Configuración</h1>
-            <p className="text-gray-400 mt-1 text-sm sm:text-base">Conexiones y preferencias</p>
+            <p className="text-gray-400 mt-1 text-sm sm:text-base">Conexiones y automatización de cartolas</p>
           </div>
           <button
             onClick={() => window.location.href = '/dashboard'}
@@ -99,11 +141,13 @@ export default function Configuracion() {
             </div>
           </div>
 
-          {conexion ? (
+          {loadingGmail ? (
+            <p className="text-gray-500 text-sm">Cargando...</p>
+          ) : conexion ? (
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                <p className="text-green-400 text-sm font-medium">Conectado: {conexion.email}</p>
+                <p className="text-green-400 text-sm font-medium truncate">Conectado: {conexion.email}</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
@@ -143,13 +187,86 @@ export default function Configuracion() {
           )}
         </div>
 
-        {/* Nota sobre sincronización automática */}
-        <div className="bg-gray-900 rounded-2xl p-4 sm:p-6">
-          <h2 className="text-base sm:text-lg font-semibold mb-2">ℹ️ Sobre la sincronización automática</h2>
-          <p className="text-gray-400 text-sm">
-            Por ahora, la sincronización se ejecuta manualmente con el botón "Sincronizar ahora".
-            La sincronización automática periódica (cada cierta cantidad de minutos) todavía no está configurada.
-          </p>
+        {/* RUT / Automatización de cartolas */}
+        <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 space-y-6">
+
+          <div>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">🔐 Tu RUT</h2>
+            <p className="text-gray-400 text-sm mb-3">
+              Ingresa tu RUT para que el sistema extraiga automáticamente los últimos 4 dígitos y desencripte tus cartolas PDF.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-gray-400 text-sm mb-1 block">
+                  RUT (con o sin puntos y guión)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: 19.279.611-K o 19279611K"
+                  value={rut}
+                  onChange={e => {
+                    setRut(e.target.value)
+                    setGuardado(false)
+                  }}
+                  disabled={guardado}
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 text-base"
+                />
+                {rut && (
+                  <p className="text-sm mt-2 text-gray-400">
+                    Contraseña automática: <span className="text-blue-400 font-mono">{extraerUltimos4(rut)}</span>
+                  </p>
+                )}
+              </div>
+
+              {guardado ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setRut('')
+                      setGuardado(false)
+                    }}
+                    className="flex-1 bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded-xl transition text-sm sm:text-base"
+                  >
+                    ✏️ Cambiar RUT
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={guardarRut}
+                  disabled={loading || !rut}
+                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 rounded-xl transition text-sm sm:text-base"
+                >
+                  {loading ? 'Guardando...' : '🔒 Guardar'}
+                </button>
+              )}
+
+              {guardado && (
+                <p className="text-green-400 text-sm">✅ RUT guardado</p>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-gray-800 pt-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">🤖 Automatización activada</h2>
+            <p className="text-gray-400 text-sm mb-4">
+              El sistema detectará automáticamente:
+            </p>
+            <div className="space-y-2 text-gray-300 text-sm">
+              <p>✅ Correos del banco con cartolas adjuntas</p>
+              <p>✅ Desencriptará el PDF con tus últimos 4 dígitos</p>
+              <p>✅ Importará todas las transacciones automáticamente</p>
+              <p>✅ Conciliará con tus registros</p>
+              <p>✅ Te notificará si hay diferencias</p>
+              <p>✅ Todo sin que hagas nada</p>
+            </div>
+          </div>
+
+          <div className="bg-blue-900/20 border border-blue-700 rounded-xl p-4">
+            <p className="text-blue-400 text-sm">
+              ℹ️ Tu RUT se guarda de forma segura. La IA lo usa para extraer automáticamente los últimos 4 dígitos como contraseña de tus cartolas.
+            </p>
+          </div>
+
         </div>
 
       </div>
