@@ -149,8 +149,8 @@ export async function POST(request) {
           .from('transacciones')
           .select('id')
           .eq('user_id', user_id)
-          .eq('descripcion', `gmail_${mensaje.id}`)
-          .single()
+          .eq('origen_id', mensaje.id)
+          .maybeSingle()
 
         if (existente) continue
 
@@ -263,6 +263,7 @@ Responde SOLO con JSON sin markdown:
             tipo: datos.tipo,
             es_transferencia_interna: datos.es_transferencia_interna || false,
             origen: 'automatico',
+            origen_id: mensaje.id,
             clasificado_por,
             confianza_ia,
             necesita_revision: datos.es_transferencia_interna ? false : necesita_revision
