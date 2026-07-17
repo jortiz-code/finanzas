@@ -29,11 +29,18 @@ export async function POST(request) {
       return Response.json({ ok: false, mensaje: 'Gmail no conectado' })
     }
 
-    const { data: cuentas } = await supabase
+    const { data: todasLasCuentas } = await supabase
       .from('cuentas')
       .select('*')
       .eq('user_id', user_id)
-      .not('email_origen', 'is', null)
+
+    // Filtramos en JS las cuentas que tengan al menos un email configurado,
+    // ya sea en el array `emails` (flujo nuevo) o en `email_origen` (flujo antiguo)
+    const cuentas = (todasLasCuentas || []).filter(c => {
+      const tieneEmails = Array.isArray(c.emails) && c.emails.length > 0
+      const tieneEmailOrigen = !!c.email_origen
+      return tieneEmails || tieneEmailOrigen
+    })
 
     if (!cuentas || cuentas.length === 0) {
       return Response.json({ ok: false, mensaje: 'No hay cuentas con email configurado' })
@@ -52,7 +59,25 @@ export async function POST(request) {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
-    const emailsOrigen = cuentas.map(c => `from:${c.email_origen}`).join(' OR ')
+    // Juntamos todos los correos posibles de todas las cuentas (array emails + email_origen legacy)
+    const todosLosEmails = []
+    for (const c of cuentas) {
+      if (Array.isArray(c.emails)) {
+        for (const e of c.emails) {
+          if (e) todosLosEmails.push(e)
+        }
+      }
+      if (c.email_origen) {
+        todosLosEmails.push(c.email_origen)
+      }
+    }
+    const emailsUnicos = [...new Set(todosLosEmails)]
+
+    if (emailsUnicos.length === 0) {
+      return Response.json({ ok: false, mensaje: 'No hay correos configurados en las cuentas' })
+    }
+
+    const emailsOrigen = emailsUnicos.map(e => `from:${e}`).join(' OR ')
     const query = `(${emailsOrigen}) newer_than:7d`
 
     console.log('Query Gmail:', query)
@@ -148,9 +173,16 @@ REGLAS:
         const datos = JSON.parse(extraccion.content[0].text)
         if (!datos.es_transaccion) continue
 
-        const cuentaMatch = cuentas.find(c =>
-          remitente.toLowerCase().includes(c.email_origen.toLowerCase())
-        )
+        // Match de cuenta: revisa tanto el array emails como email_origen (legacy)
+        const cuentaMatch = cuentas.find(c => {
+          const emailsDeCuenta = []
+          if (Array.isArray(c.emails)) emailsDeCuenta.push(...c.emails)
+          if (c.email_origen) emailsDeCuenta.push(c.email_origen)
+
+          return emailsDeCuenta.some(e =>
+            e && remitente.toLowerCase().includes(e.toLowerCase())
+          )
+        })
 
         const { data: reglas } = await supabase
           .from('reglas_ia')
