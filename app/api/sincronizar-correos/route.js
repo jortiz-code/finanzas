@@ -255,11 +255,32 @@ export async function POST(request) {
         }
 
         const remitente = correo.payload.headers?.find(h => h.name === 'From')?.value || ''
+        const asunto = correo.payload.headers?.find(h => h.name === 'Subject')?.value || ''
 
-        // Filtro gratuito antes de gastar IA: un correo de transacción real
-        // SIEMPRE menciona un monto en dinero (ej: $15.000, $1.500.99).
-        // Si no aparece nada así, es muy probable que sea promocional/newsletter,
-        // así que lo saltamos sin llamar a la IA.
+        // Filtro gratuito #1: palabras típicas de correos promocionales/marketing
+        // en el asunto. Si aparece alguna, casi seguro no es un aviso de transacción.
+        const PALABRAS_PROMOCIONALES = [
+          'promoción', 'promocion', 'oferta', 'descuento', 'cyber', 'sorteo',
+          'concurso', 'boletín', 'boletin', 'newsletter', 'cupón', 'cupon',
+          'regalo', 'invitación', 'invitacion', 'webinar', 'encuesta',
+          'conoce', 'descubre', 'nueva tarjeta', 'black friday', 'liquidación',
+          'liquidacion', 'gift card', 'beneficios exclusivos', 'suscríbete',
+          'suscribete', 'gana', 'ganador'
+        ]
+        const asuntoLower = asunto.toLowerCase()
+        const pareceSpamPromocional = PALABRAS_PROMOCIONALES.some(p => asuntoLower.includes(p))
+
+        if (pareceSpamPromocional) {
+          console.log(`[${mensajeId}] SALTADO: asunto parece promocional ("${asunto}") (sin gastar IA)`)
+          await supabase.from('correos_gmail_procesados').upsert({
+            user_id, mensaje_id: mensajeId, es_transaccion: false
+          }, { onConflict: 'user_id,mensaje_id' })
+          continue
+        }
+
+        // Filtro gratuito #2: un correo de transacción real SIEMPRE menciona
+        // un monto en dinero (ej: $15.000, $1.500.99). Si no aparece nada así,
+        // es muy probable que sea promocional/informativo sin transacción.
         const tieneMontoAparente = /\$\s?\d[\d.,]*\d|\d[\d.,]*\d\s?(?:CLP|pesos)/i.test(texto)
         if (!tieneMontoAparente) {
           console.log(`[${mensajeId}] SALTADO: sin monto aparente, probablemente no es transacción (sin gastar IA)`)
