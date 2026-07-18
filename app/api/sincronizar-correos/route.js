@@ -192,15 +192,18 @@ export async function POST(request) {
 
     console.log('Correos encontrados (total):', idsEncontrados.length)
 
-    // Revisamos en bloque cuáles de esos IDs ya están guardados, para no
-    // gastar tiempo/IA reprocesando duplicados.
+    // Revisamos en bloque cuáles de esos IDs YA FUERON REVISADOS antes
+    // (hayan resultado en una transacción o no). Antes solo chequeábamos
+    // contra `transacciones`, lo que hacía que los correos promocionales
+    // (descartados por la IA) se re-analizaran en cada corrida del cron,
+    // gastando IA sin necesidad.
     const { data: yaExistentes } = await supabase
-      .from('transacciones')
-      .select('origen_id')
+      .from('correos_gmail_procesados')
+      .select('mensaje_id')
       .eq('user_id', user_id)
-      .in('origen_id', idsEncontrados)
+      .in('mensaje_id', idsEncontrados)
 
-    const idsYaGuardados = new Set((yaExistentes || []).map(t => t.origen_id))
+    const idsYaGuardados = new Set((yaExistentes || []).map(t => t.mensaje_id))
     const idsNuevos = idsEncontrados.filter(id => !idsYaGuardados.has(id))
 
     console.log('Correos ya guardados:', idsYaGuardados.size, '| Correos nuevos por procesar:', idsNuevos.length)
@@ -245,13 +248,29 @@ export async function POST(request) {
 
         if (!texto) {
           console.log(`[${mensajeId}] SALTADO: sin texto extraíble`)
+          await supabase.from('correos_gmail_procesados').upsert({
+            user_id, mensaje_id: mensajeId, es_transaccion: false
+          }, { onConflict: 'user_id,mensaje_id' })
           continue
         }
 
         const remitente = correo.payload.headers?.find(h => h.name === 'From')?.value || ''
 
+        // Filtro gratuito antes de gastar IA: un correo de transacción real
+        // SIEMPRE menciona un monto en dinero (ej: $15.000, $1.500.99).
+        // Si no aparece nada así, es muy probable que sea promocional/newsletter,
+        // así que lo saltamos sin llamar a la IA.
+        const tieneMontoAparente = /\$\s?\d[\d.,]*\d|\d[\d.,]*\d\s?(?:CLP|pesos)/i.test(texto)
+        if (!tieneMontoAparente) {
+          console.log(`[${mensajeId}] SALTADO: sin monto aparente, probablemente no es transacción (sin gastar IA)`)
+          await supabase.from('correos_gmail_procesados').upsert({
+            user_id, mensaje_id: mensajeId, es_transaccion: false
+          }, { onConflict: 'user_id,mensaje_id' })
+          continue
+        }
+
         const extraccion = await anthropic.messages.create({
-          model: 'claude-sonnet-4-6',
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: 500,
           messages: [{
             role: 'user',
@@ -287,6 +306,9 @@ REGLAS:
         const datos = JSON.parse(extraccion.content[0].text)
         if (!datos.es_transaccion) {
           console.log(`[${mensajeId}] SALTADO: IA dice que no es transacción`)
+          await supabase.from('correos_gmail_procesados').upsert({
+            user_id, mensaje_id: mensajeId, es_transaccion: false
+          }, { onConflict: 'user_id,mensaje_id' })
           continue
         }
 
@@ -324,7 +346,7 @@ REGLAS:
           const listaCategorias = categorias.map(c => c.nombre).join('\n')
 
           const clasificacion = await anthropic.messages.create({
-            model: 'claude-sonnet-4-6',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 200,
             messages: [{
               role: 'user',
@@ -374,6 +396,10 @@ Responde SOLO con JSON sin markdown:
           errores++
           continue
         }
+
+        await supabase.from('correos_gmail_procesados').upsert({
+          user_id, mensaje_id: mensajeId, es_transaccion: true
+        }, { onConflict: 'user_id,mensaje_id' })
 
         if (necesita_revision && !datos.es_transferencia_interna && transaccion?.[0]) {
           await supabase.from('alertas').insert({
