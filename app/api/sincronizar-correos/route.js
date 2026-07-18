@@ -194,7 +194,10 @@ export async function POST(request) {
 
         const texto = extraerTextoCorreo(correo.payload)
 
-        if (!texto) continue
+        if (!texto) {
+          console.log(`[${mensaje.id}] SALTADO: sin texto extraíble`)
+          continue
+        }
 
         const remitente = correo.payload.headers?.find(h => h.name === 'From')?.value || ''
 
@@ -205,7 +208,10 @@ export async function POST(request) {
           .eq('origen_id', mensaje.id)
           .maybeSingle()
 
-        if (existente) continue
+        if (existente) {
+          console.log(`[${mensaje.id}] SALTADO: ya existe (duplicado)`)
+          continue
+        }
 
         const extraccion = await anthropic.messages.create({
           model: 'claude-sonnet-4-6',
@@ -242,7 +248,10 @@ REGLAS:
         })
 
         const datos = JSON.parse(extraccion.content[0].text)
-        if (!datos.es_transaccion) continue
+        if (!datos.es_transaccion) {
+          console.log(`[${mensaje.id}] SALTADO: IA dice que no es transacción`)
+          continue
+        }
 
         // Match de cuenta: revisa tanto el array emails como email_origen (legacy)
         const cuentaMatch = cuentas.find(c => {
