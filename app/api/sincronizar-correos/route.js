@@ -333,10 +333,15 @@ Responde SOLO con JSON sin markdown:
 
 Si NO es una transacción bancaria responde: {"es_transaccion": false}
 
+Si el correo informa que un pago, compra o transferencia fue RECHAZADO, FALLIDO,
+CANCELADO, o no se pudo procesar (ej: "saldo insuficiente", "pago rechazado",
+"transacción no autorizada"), responde también {"es_transaccion": false}, ya
+que no hubo un movimiento real de dinero.
+
 REGLAS:
 - monto siempre número sin puntos ni comas
 - tipo es "gasto", "ingreso" o "transferencia"
-- fecha formato YYYY-MM-DD
+- fecha formato YYYY-MM-DD (si el correo no menciona una fecha clara, usa la fecha de hoy)
 - comercio es el nombre del negocio
 - es_transferencia_interna es true cuando el dinero se mueve entre cuentas propias del mismo usuario`
           }]
@@ -346,6 +351,17 @@ REGLAS:
         const datos = JSON.parse(textoRespuestaExtraccion)
         if (!datos.es_transaccion) {
           console.log(`[${mensajeId}] SALTADO: IA dice que no es transacción`)
+          await supabase.from('correos_gmail_procesados').upsert({
+            user_id, mensaje_id: mensajeId, es_transaccion: false
+          }, { onConflict: 'user_id,mensaje_id' })
+          continue
+        }
+
+        // Red de seguridad: si por algún motivo la IA no logró extraer una
+        // fecha válida, no intentamos guardar (la columna es NOT NULL en la
+        // base de datos) — solo lo marcamos como revisado y seguimos.
+        if (!datos.fecha) {
+          console.log(`[${mensajeId}] SALTADO: sin fecha extraída (${datos.descripcion || 'sin descripción'})`)
           await supabase.from('correos_gmail_procesados').upsert({
             user_id, mensaje_id: mensajeId, es_transaccion: false
           }, { onConflict: 'user_id,mensaje_id' })
