@@ -164,17 +164,66 @@ export async function POST(request) {
 
     console.log('Query Gmail:', query)
 
-    const { data: mensajes } = await gmail.users.messages.list({
-      userId: 'me',
-      q: query,
-      maxResults: 10
-    })
+    // Traemos TODOS los IDs de correos que coincidan (con paginación), sin
+    // procesarlos todavía. Esto es barato (no gasta IA), así que podemos
+    // permitirnos revisar un rango amplio sin arriesgar timeout.
+    let idsEncontrados = []
+    let pageToken = undefined
+    const TOPE_SEGURIDAD_IDS = 200
 
-    if (!mensajes.messages || mensajes.messages.length === 0) {
+    do {
+      const { data: pagina } = await gmail.users.messages.list({
+        userId: 'me',
+        q: query,
+        maxResults: 100,
+        pageToken
+      })
+
+      if (pagina.messages) {
+        idsEncontrados.push(...pagina.messages.map(m => m.id))
+      }
+      pageToken = pagina.nextPageToken
+
+    } while (pageToken && idsEncontrados.length < TOPE_SEGURIDAD_IDS)
+
+    if (idsEncontrados.length === 0) {
       return Response.json({ ok: true, procesados: 0, mensaje: 'No hay correos nuevos' })
     }
 
-    console.log('Correos encontrados:', mensajes.messages.length)
+    console.log('Correos encontrados (total):', idsEncontrados.length)
+
+    // Revisamos en bloque cuáles de esos IDs ya están guardados, para no
+    // gastar tiempo/IA reprocesando duplicados.
+    const { data: yaExistentes } = await supabase
+      .from('transacciones')
+      .select('origen_id')
+      .eq('user_id', user_id)
+      .in('origen_id', idsEncontrados)
+
+    const idsYaGuardados = new Set((yaExistentes || []).map(t => t.origen_id))
+    const idsNuevos = idsEncontrados.filter(id => !idsYaGuardados.has(id))
+
+    console.log('Correos ya guardados:', idsYaGuardados.size, '| Correos nuevos por procesar:', idsNuevos.length)
+
+    if (idsNuevos.length === 0) {
+      return Response.json({
+        ok: true,
+        procesados: 0,
+        mensaje: `${idsEncontrados.length} correos encontrados, todos ya estaban importados`
+      })
+    }
+
+    // Procesamos los más antiguos primero (Gmail los devuelve del más nuevo
+    // al más viejo, así que invertimos el orden).
+    idsNuevos.reverse()
+
+    // Tope de correos NUEVOS a procesar en esta corrida, para no exceder el
+    // tiempo máximo de la función. Si quedan más, el usuario puede volver a
+    // apretar "Activar" y esta vez avanzará con los siguientes (los ya
+    // guardados se saltan rápido).
+    const TOPE_PROCESAMIENTO_IA = 15
+    const idsAProcesar = idsNuevos.slice(0, TOPE_PROCESAMIENTO_IA)
+    const idsPendientesParaSiguienteCorrida = idsNuevos.length - idsAProcesar.length
 
     const { data: categorias } = await supabase
       .from('categorias')
@@ -184,34 +233,22 @@ export async function POST(request) {
     let procesados = 0
     let errores = 0
 
-    for (const mensaje of mensajes.messages) {
+    for (const mensajeId of idsAProcesar) {
       try {
         const { data: correo } = await gmail.users.messages.get({
           userId: 'me',
-          id: mensaje.id,
+          id: mensajeId,
           format: 'full'
         })
 
         const texto = extraerTextoCorreo(correo.payload)
 
         if (!texto) {
-          console.log(`[${mensaje.id}] SALTADO: sin texto extraíble`)
+          console.log(`[${mensajeId}] SALTADO: sin texto extraíble`)
           continue
         }
 
         const remitente = correo.payload.headers?.find(h => h.name === 'From')?.value || ''
-
-        const { data: existente } = await supabase
-          .from('transacciones')
-          .select('id')
-          .eq('user_id', user_id)
-          .eq('origen_id', mensaje.id)
-          .maybeSingle()
-
-        if (existente) {
-          console.log(`[${mensaje.id}] SALTADO: ya existe (duplicado)`)
-          continue
-        }
 
         const extraccion = await anthropic.messages.create({
           model: 'claude-sonnet-4-6',
@@ -249,7 +286,7 @@ REGLAS:
 
         const datos = JSON.parse(extraccion.content[0].text)
         if (!datos.es_transaccion) {
-          console.log(`[${mensaje.id}] SALTADO: IA dice que no es transacción`)
+          console.log(`[${mensajeId}] SALTADO: IA dice que no es transacción`)
           continue
         }
 
@@ -325,7 +362,7 @@ Responde SOLO con JSON sin markdown:
             tipo: datos.tipo,
             es_transferencia_interna: datos.es_transferencia_interna || false,
             origen: 'automatico',
-            origen_id: mensaje.id,
+            origen_id: mensajeId,
             clasificado_por,
             confianza_ia,
             necesita_revision: datos.es_transferencia_interna ? false : necesita_revision
@@ -350,7 +387,7 @@ Responde SOLO con JSON sin markdown:
         console.log('Transacción guardada:', datos.descripcion, datos.monto)
 
       } catch (e) {
-        console.error('Error procesando correo:', mensaje.id, '-', e?.message || e)
+        console.error('Error procesando correo:', mensajeId, '-', e?.message || e)
         if (e?.error) console.error('Detalle del error:', JSON.stringify(e.error))
         if (e?.status) console.error('Status:', e.status)
         errores++
@@ -361,7 +398,10 @@ Responde SOLO con JSON sin markdown:
       ok: true,
       procesados,
       errores,
-      mensaje: `${procesados} transacciones importadas`
+      pendientes: idsPendientesParaSiguienteCorrida,
+      mensaje: idsPendientesParaSiguienteCorrida > 0
+        ? `${procesados} transacciones importadas. Quedan ${idsPendientesParaSiguienteCorrida} correos más por revisar — aprieta "Activar" de nuevo para seguir.`
+        : `${procesados} transacciones importadas`
     })
 
   } catch (error) {
