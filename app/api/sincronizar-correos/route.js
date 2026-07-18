@@ -341,7 +341,9 @@ Responde SOLO con JSON sin markdown:
         console.log('Transacción guardada:', datos.descripcion, datos.monto)
 
       } catch (e) {
-        console.error('Error procesando correo:', e.message)
+        console.error('Error procesando correo:', mensaje.id, '-', e?.message || e)
+        if (e?.error) console.error('Detalle del error:', JSON.stringify(e.error))
+        if (e?.status) console.error('Status:', e.status)
         errores++
       }
     }
