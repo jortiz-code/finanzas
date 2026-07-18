@@ -7,6 +7,9 @@ export default function Cuentas() {
   const [bancos, setBancos] = useState([])
   const [mostrarForm, setMostrarForm] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [usuario, setUsuario] = useState(null)
+  const [activando, setActivando] = useState(null) // id de cuenta en proceso, o 'todas'
+  const [resultados, setResultados] = useState({}) // { [cuentaId o 'todas']: mensaje }
   const [form, setForm] = useState({
     nombre: '',
     banco: '',
@@ -26,6 +29,7 @@ export default function Cuentas() {
   const cargarCuentas = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return window.location.href = '/auth'
+    setUsuario(user)
 
     const { data } = await supabase
       .from('cuentas')
@@ -66,6 +70,54 @@ export default function Cuentas() {
     cargarCuentas()
   }
 
+  // Sincroniza con ventana amplia (30 días) una cuenta específica
+  const activarCuenta = async (cuenta) => {
+    if (!usuario) return
+    setActivando(cuenta.id)
+    setResultados(prev => ({ ...prev, [cuenta.id]: null }))
+
+    try {
+      const response = await fetch('/api/sincronizar-correos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: usuario.id, cuenta_id: cuenta.id, ventana: '30d' })
+      })
+      const data = await response.json()
+      setResultados(prev => ({
+        ...prev,
+        [cuenta.id]: data.mensaje || (data.ok ? 'Listo' : 'Error al activar')
+      }))
+    } catch (e) {
+      setResultados(prev => ({ ...prev, [cuenta.id]: 'Error al activar' }))
+    }
+
+    setActivando(null)
+  }
+
+  // Sincroniza con ventana amplia (30 días) todas las cuentas
+  const activarTodas = async () => {
+    if (!usuario) return
+    setActivando('todas')
+    setResultados(prev => ({ ...prev, todas: null }))
+
+    try {
+      const response = await fetch('/api/sincronizar-correos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: usuario.id, ventana: '30d' })
+      })
+      const data = await response.json()
+      setResultados(prev => ({
+        ...prev,
+        todas: data.mensaje || (data.ok ? 'Listo' : 'Error al activar')
+      }))
+    } catch (e) {
+      setResultados(prev => ({ ...prev, todas: 'Error al activar' }))
+    }
+
+    setActivando(null)
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
@@ -90,6 +142,30 @@ export default function Cuentas() {
             </button>
           </div>
         </div>
+
+        {/* Activar todas */}
+        {cuentas.length > 0 && (
+          <div className="bg-purple-900/20 border border-purple-700 rounded-2xl p-4 sm:p-6 mb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <div>
+                <h2 className="font-semibold text-purple-300">⚡ Activar todas las cuentas</h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  Busca transacciones del último mes en todas tus cuentas de una vez
+                </p>
+              </div>
+              <button
+                onClick={activarTodas}
+                disabled={activando === 'todas'}
+                className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 px-4 py-2 rounded-xl transition text-sm sm:text-base whitespace-nowrap"
+              >
+                {activando === 'todas' ? '🔄 Activando...' : '⚡ Activar todas'}
+              </button>
+            </div>
+            {resultados.todas && (
+              <p className="text-purple-300 text-sm mt-3">{resultados.todas}</p>
+            )}
+          </div>
+        )}
 
         {/* Formulario */}
         {mostrarForm && (
@@ -173,6 +249,19 @@ export default function Cuentas() {
                   >
                     ×
                   </button>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-800">
+                  <button
+                    onClick={() => activarCuenta(cuenta)}
+                    disabled={activando === cuenta.id}
+                    className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 px-4 py-2 rounded-xl transition text-sm"
+                  >
+                    {activando === cuenta.id ? '🔄 Activando...' : '⚡ Activar (buscar último mes)'}
+                  </button>
+                  {resultados[cuenta.id] && (
+                    <p className="text-purple-300 text-xs mt-2">{resultados[cuenta.id]}</p>
+                  )}
                 </div>
               </div>
             ))}

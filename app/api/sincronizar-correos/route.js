@@ -63,9 +63,10 @@ function extraerTextoCorreo(payload) {
 
 export async function POST(request) {
   try {
-    const { user_id } = await request.json()
+    const { user_id, ventana, cuenta_id } = await request.json()
+    const ventanaBusqueda = ventana || '7d'
 
-    console.log('=== SINCRONIZANDO CORREOS ===', user_id)
+    console.log('=== SINCRONIZANDO CORREOS ===', user_id, cuenta_id ? `(solo cuenta ${cuenta_id})` : '(todas las cuentas)')
 
     const { data: conexion, error: errorConexion } = await supabase
       .from('conexiones_correo')
@@ -106,14 +107,22 @@ export async function POST(request) {
 
     // Filtramos en JS las cuentas que tengan al menos un email configurado,
     // ya sea en el array `emails` (flujo nuevo) o en `email_origen` (flujo antiguo)
-    const cuentas = cuentasNormalizadas.filter(c => {
+    let cuentas = cuentasNormalizadas.filter(c => {
       const tieneEmails = c.emailsArray.length > 0
       const tieneEmailOrigen = !!c.email_origen
       return tieneEmails || tieneEmailOrigen
     })
 
+    // Si se pidió sincronizar solo una cuenta específica, filtramos a esa nada más
+    if (cuenta_id) {
+      cuentas = cuentas.filter(c => c.id === cuenta_id)
+    }
+
     if (!cuentas || cuentas.length === 0) {
-      return Response.json({ ok: false, mensaje: 'No hay cuentas con email configurado' })
+      return Response.json({
+        ok: false,
+        mensaje: cuenta_id ? 'Esa cuenta no tiene emails configurados' : 'No hay cuentas con email configurado'
+      })
     }
 
     const oauth2Client = new google.auth.OAuth2(
@@ -146,7 +155,7 @@ export async function POST(request) {
     }
 
     const emailsOrigen = emailsUnicos.map(e => `from:${e}`).join(' OR ')
-    const query = `(${emailsOrigen}) newer_than:7d`
+    const query = `(${emailsOrigen}) newer_than:${ventanaBusqueda}`
 
     console.log('Query Gmail:', query)
 
