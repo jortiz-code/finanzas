@@ -1,3 +1,4 @@
+
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
@@ -324,7 +325,8 @@ REGLAS:
           }]
         })
 
-        const datos = JSON.parse(extraccion.content[0].text)
+        const textoRespuestaExtraccion = extraccion.content[0].text.replace(/```json|```/g, '').trim()
+        const datos = JSON.parse(textoRespuestaExtraccion)
         if (!datos.es_transaccion) {
           console.log(`[${mensajeId}] SALTADO: IA dice que no es transacción`)
           await supabase.from('correos_gmail_procesados').upsert({
@@ -380,7 +382,8 @@ Responde SOLO con JSON sin markdown:
             }]
           })
 
-          const resultadoClasificacion = JSON.parse(clasificacion.content[0].text)
+          const textoRespuestaClasificacion = clasificacion.content[0].text.replace(/```json|```/g, '').trim()
+          const resultadoClasificacion = JSON.parse(textoRespuestaClasificacion)
           const categoriaEncontrada = categorias.find(
             c => c.nombre.toLowerCase() === resultadoClasificacion.categoria?.toLowerCase()
           )
@@ -438,6 +441,22 @@ Responde SOLO con JSON sin markdown:
         if (e?.error) console.error('Detalle del error:', JSON.stringify(e.error))
         if (e?.status) console.error('Status:', e.status)
         errores++
+
+        // Red de seguridad SOLO para errores de parseo (bugs de código que
+        // siempre van a fallar igual, como el de markdown que tuvimos).
+        // Errores de la API (falta de crédito, rate limit, etc.) NO se
+        // marcan como procesados, para que se reintenten automáticamente
+        // una vez se resuelva el problema (ej: cuando recargues crédito).
+        const esErrorDeParseo = e instanceof SyntaxError
+        if (esErrorDeParseo) {
+          try {
+            await supabase.from('correos_gmail_procesados').upsert({
+              user_id, mensaje_id: mensajeId, es_transaccion: false
+            }, { onConflict: 'user_id,mensaje_id' })
+          } catch (e2) {
+            console.error('No se pudo marcar como procesado tras error:', mensajeId)
+          }
+        }
       }
     }
 
