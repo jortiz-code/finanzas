@@ -8,6 +8,8 @@ export default function Configuracion() {
   const [loadingGmail, setLoadingGmail] = useState(true)
   const [sincronizando, setSincronizando] = useState(false)
   const [resultadoSync, setResultadoSync] = useState(null)
+  const [syncEstado, setSyncEstado] = useState(null)
+  const [reactivando, setReactivando] = useState(false)
 
   const [rut, setRut] = useState('')
   const [guardado, setGuardado] = useState(false)
@@ -32,6 +34,13 @@ export default function Configuracion() {
     setConexion(conex || null)
     setLoadingGmail(false)
 
+    const { data: estado } = await supabase
+      .from('sync_estado')
+      .select('*')
+      .eq('id', 1)
+      .single()
+    setSyncEstado(estado || null)
+
     const { data } = await supabase
       .from('configuracion_usuarios')
       .select('cartola_password')
@@ -41,6 +50,15 @@ export default function Configuracion() {
     if (data?.cartola_password) {
       setGuardado(true)
     }
+  }
+
+  const reactivarSincronizacion = async () => {
+    setReactivando(true)
+    await supabase
+      .from('sync_estado')
+      .upsert({ id: 1, pausado: false, motivo: null, updated_at: new Date().toISOString() })
+    await cargarTodo()
+    setReactivando(false)
   }
 
   // --- Gmail ---
@@ -126,6 +144,28 @@ export default function Configuracion() {
             ← Volver
           </button>
         </div>
+
+        {/* Freno de emergencia activado */}
+        {syncEstado?.pausado && (
+          <div className="bg-red-900/20 border border-red-700 rounded-2xl p-4 sm:p-6 mb-6">
+            <div className="flex items-start gap-3 mb-3">
+              <span className="text-2xl">🛑</span>
+              <div>
+                <h2 className="font-semibold text-red-400">Sincronización pausada automáticamente</h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  {syncEstado.motivo || 'Se detectaron demasiados errores seguidos.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={reactivarSincronizacion}
+              disabled={reactivando}
+              className="bg-red-600 hover:bg-red-500 disabled:opacity-50 px-4 py-2 rounded-xl transition text-sm sm:text-base"
+            >
+              {reactivando ? 'Reactivando...' : '▶️ Reactivar sincronización'}
+            </button>
+          </div>
+        )}
 
         {/* Conexión Gmail */}
         <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-6">

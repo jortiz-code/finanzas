@@ -1,4 +1,3 @@
-
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
@@ -71,6 +70,24 @@ export async function POST(request) {
   try {
     const { user_id, ventana, cuenta_id } = await request.json()
     const ventanaBusqueda = ventana || '7d'
+
+    // Freno de emergencia: si una corrida anterior tuvo muchos errores
+    // seguidos, el sistema se pausa solo hasta que alguien lo revise y
+    // reactive manualmente, para evitar gastar de más por un bug no previsto.
+    const { data: estadoSync } = await supabase
+      .from('sync_estado')
+      .select('*')
+      .eq('id', 1)
+      .single()
+
+    if (estadoSync?.pausado) {
+      console.log('SINCRONIZACIÓN PAUSADA:', estadoSync.motivo)
+      return Response.json({
+        ok: false,
+        pausado: true,
+        mensaje: `Sincronización pausada automáticamente: ${estadoSync.motivo || 'errores repetidos'}. Ve a Configuración para reactivarla.`
+      })
+    }
 
     console.log('=== SINCRONIZANDO CORREOS ===', user_id, cuenta_id ? `(solo cuenta ${cuenta_id})` : '(todas las cuentas)')
 
@@ -458,6 +475,19 @@ Responde SOLO con JSON sin markdown:
           }
         }
       }
+    }
+
+    // Freno de emergencia: si hubo demasiados errores en esta corrida,
+    // pausamos la sincronización automáticamente hasta revisión manual.
+    const UMBRAL_ERRORES_PARA_PAUSAR = 5
+    if (errores >= UMBRAL_ERRORES_PARA_PAUSAR) {
+      await supabase.from('sync_estado').upsert({
+        id: 1,
+        pausado: true,
+        motivo: `${errores} errores en una sola corrida (${new Date().toLocaleString('es-CL')})`,
+        updated_at: new Date().toISOString()
+      })
+      console.log('SINCRONIZACIÓN PAUSADA AUTOMÁTICAMENTE por exceso de errores')
     }
 
     return Response.json({
