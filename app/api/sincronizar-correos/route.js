@@ -297,11 +297,24 @@ export async function POST(request) {
         }
 
         // Filtro gratuito #2: un correo de transacción real SIEMPRE menciona
-        // un monto en dinero (ej: $15.000, $1.500.99). Si no aparece nada así,
-        // es muy probable que sea promocional/informativo sin transacción.
-        const tieneMontoAparente = /\$\s?\d[\d.,]*\d|\d[\d.,]*\d\s?(?:CLP|pesos)/i.test(texto)
-        if (!tieneMontoAparente) {
-          console.log(`[${mensajeId}] SALTADO: sin monto aparente, probablemente no es transacción (sin gastar IA)`)
+        // un monto en dinero. En vez de depender de una palabra específica
+        // (que varía mucho entre bancos y es imposible anticipar al 100%),
+        // buscamos CUALQUIER número con formato de miles chileno (ej:
+        // 827.640, $15.000, 1.500.990) en cualquier parte del texto. Es más
+        // permisivo a propósito: preferimos gastar algo de IA de más en
+        // casos dudosos, antes que perder silenciosamente una transacción
+        // real por no reconocer el formato de un banco nuevo.
+        // Filtro gratuito #2: intentamos distinguir "monto real" de RUT/fecha/
+        // cuenta/etc con regex, pero eso resultó ser un problema sin solución
+        // robusta (cada formato nuevo de banco rompe el patrón anterior).
+        // Simplificamos a su versión mínima y confiable: solo descartamos si
+        // el correo NO TIENE NINGÚN NÚMERO en absoluto (correos puramente
+        // promocionales/de texto). Si hay al menos un número de 2+ dígitos,
+        // dejamos que sea la IA quien decida qué es (monto, RUT, fecha, etc),
+        // que es un trabajo de comprensión de texto, no de patrones.
+        const tieneAlgunNumero = /\d{2,}/.test(texto)
+        if (!tieneAlgunNumero) {
+          console.log(`[${mensajeId}] SALTADO: sin ningún número en el texto (sin gastar IA)`)
           await supabase.from('correos_gmail_procesados').upsert({
             user_id, mensaje_id: mensajeId, es_transaccion: false
           }, { onConflict: 'user_id,mensaje_id' })
