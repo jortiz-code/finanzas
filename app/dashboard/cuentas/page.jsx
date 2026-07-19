@@ -70,23 +70,59 @@ export default function Cuentas() {
     cargarCuentas()
   }
 
-  // Sincroniza con ventana amplia (30 días) una cuenta específica
+  // Calcula cuántos días han pasado desde el 1 del mes actual, para usar
+  // como ventana de búsqueda en vez de un número fijo (30 se queda corto
+  // en meses de 31 días, y es más de lo necesario a comienzos de mes).
+  const calcularVentanaDelMes = () => {
+    const hoy = new Date()
+    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+    const diasTranscurridos = Math.ceil((hoy - primerDiaMes) / (1000 * 60 * 60 * 24)) + 1
+    return `${diasTranscurridos}d`
+  }
+
+  // Sincroniza con ventana amplia (desde el 1 del mes actual) una cuenta
+  // específica. Llama al endpoint repetidamente hasta que no queden correos
+  // pendientes, para que sea "un solo click" aunque el servidor solo
+  // procese de a poco.
   const activarCuenta = async (cuenta) => {
     if (!usuario) return
     setActivando(cuenta.id)
-    setResultados(prev => ({ ...prev, [cuenta.id]: null }))
+    setResultados(prev => ({ ...prev, [cuenta.id]: 'Iniciando...' }))
+
+    const ventana = calcularVentanaDelMes()
+    const TOPE_INTENTOS = 25 // seguridad para no quedar en loop infinito
+    let totalProcesadas = 0
+    let intentos = 0
 
     try {
-      const response = await fetch('/api/sincronizar-correos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: usuario.id, cuenta_id: cuenta.id, ventana: '30d' })
-      })
-      const data = await response.json()
-      setResultados(prev => ({
-        ...prev,
-        [cuenta.id]: data.mensaje || (data.ok ? 'Listo' : 'Error al activar')
-      }))
+      while (intentos < TOPE_INTENTOS) {
+        intentos++
+        const response = await fetch('/api/sincronizar-correos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: usuario.id, cuenta_id: cuenta.id, ventana })
+        })
+        const data = await response.json()
+
+        if (data.pausado) {
+          setResultados(prev => ({ ...prev, [cuenta.id]: `🛑 ${data.mensaje}` }))
+          break
+        }
+
+        totalProcesadas += data.procesados || 0
+        setResultados(prev => ({
+          ...prev,
+          [cuenta.id]: `Procesando... ${totalProcesadas} transacciones importadas hasta ahora`
+        }))
+
+        if (!data.pendientes || data.pendientes === 0) {
+          setResultados(prev => ({
+            ...prev,
+            [cuenta.id]: `✅ Listo: ${totalProcesadas} transacciones importadas en total`
+          }))
+          break
+        }
+      }
     } catch (e) {
       setResultados(prev => ({ ...prev, [cuenta.id]: 'Error al activar' }))
     }
@@ -94,23 +130,47 @@ export default function Cuentas() {
     setActivando(null)
   }
 
-  // Sincroniza con ventana amplia (30 días) todas las cuentas
+  // Sincroniza con ventana amplia (desde el 1 del mes actual) todas las
+  // cuentas, repitiendo hasta que no queden correos pendientes en ninguna.
   const activarTodas = async () => {
     if (!usuario) return
     setActivando('todas')
-    setResultados(prev => ({ ...prev, todas: null }))
+    setResultados(prev => ({ ...prev, todas: 'Iniciando...' }))
+
+    const ventana = calcularVentanaDelMes()
+    const TOPE_INTENTOS = 25
+    let totalProcesadas = 0
+    let intentos = 0
 
     try {
-      const response = await fetch('/api/sincronizar-correos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: usuario.id, ventana: '30d' })
-      })
-      const data = await response.json()
-      setResultados(prev => ({
-        ...prev,
-        todas: data.mensaje || (data.ok ? 'Listo' : 'Error al activar')
-      }))
+      while (intentos < TOPE_INTENTOS) {
+        intentos++
+        const response = await fetch('/api/sincronizar-correos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: usuario.id, ventana })
+        })
+        const data = await response.json()
+
+        if (data.pausado) {
+          setResultados(prev => ({ ...prev, todas: `🛑 ${data.mensaje}` }))
+          break
+        }
+
+        totalProcesadas += data.procesados || 0
+        setResultados(prev => ({
+          ...prev,
+          todas: `Procesando... ${totalProcesadas} transacciones importadas hasta ahora`
+        }))
+
+        if (!data.pendientes || data.pendientes === 0) {
+          setResultados(prev => ({
+            ...prev,
+            todas: `✅ Listo: ${totalProcesadas} transacciones importadas en total`
+          }))
+          break
+        }
+      }
     } catch (e) {
       setResultados(prev => ({ ...prev, todas: 'Error al activar' }))
     }
@@ -150,7 +210,7 @@ export default function Cuentas() {
               <div>
                 <h2 className="font-semibold text-purple-300">⚡ Activar todas las cuentas</h2>
                 <p className="text-gray-400 text-sm mt-1">
-                  Busca transacciones del último mes en todas tus cuentas de una vez
+                  Busca transacciones desde el 1 del mes actual en todas tus cuentas de una vez
                 </p>
               </div>
               <button
@@ -257,7 +317,7 @@ export default function Cuentas() {
                     disabled={activando === cuenta.id}
                     className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 px-4 py-2 rounded-xl transition text-sm"
                   >
-                    {activando === cuenta.id ? '🔄 Activando...' : '⚡ Activar (buscar último mes)'}
+                    {activando === cuenta.id ? '🔄 Activando...' : '⚡ Activar (buscar desde el 1 del mes)'}
                   </button>
                   {resultados[cuenta.id] && (
                     <p className="text-purple-300 text-xs mt-2">{resultados[cuenta.id]}</p>
