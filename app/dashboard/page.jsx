@@ -291,6 +291,10 @@ function EditarTransaccionModal({ transaccion, categorias, onComplete, onCancel 
 export default function Dashboard() {
   const [usuario, setUsuario] = useState(null)
   const [kpis, setKpis] = useState({ total_gastos: 0, total_ingresos: 0, pendientes: 0 })
+  const [kpisMesAnterior, setKpisMesAnterior] = useState({ total_gastos: 0, total_ingresos: 0 })
+  const [gastosPorCategoria, setGastosPorCategoria] = useState([])
+  const [presupuestosMes, setPresupuestosMes] = useState([])
+  const [alertasActivas, setAlertasActivas] = useState([])
   const [transacciones, setTransacciones] = useState([])
   const [transaccionesPendientes, setTransaccionesPendientes] = useState([])
   const [cuentas, setCuentas] = useState([])
@@ -310,6 +314,45 @@ export default function Dashboard() {
       p_año: añoActual
     })
     if (kpis_data) setKpis(kpis_data)
+
+    // Mes anterior, para la comparación
+    let mesAnteriorNum = mesActual - 1
+    let añoMesAnterior = añoActual
+    if (mesAnteriorNum === 0) {
+      mesAnteriorNum = 12
+      añoMesAnterior = añoActual - 1
+    }
+    const { data: kpisAnterior } = await supabase.rpc('get_kpis', {
+      p_user_id: user.id,
+      p_mes: mesAnteriorNum,
+      p_año: añoMesAnterior
+    })
+    if (kpisAnterior) setKpisMesAnterior(kpisAnterior)
+
+    // Gastos por categoría del mes, para saber la categoría top
+    const { data: gastosCat } = await supabase.rpc('get_gastos_por_categoria', {
+      p_user_id: user.id,
+      p_mes: mesActual,
+      p_año: añoActual
+    })
+    setGastosPorCategoria(gastosCat || [])
+
+    // Presupuestos del mes, para el % usado
+    const { data: presupuestos } = await supabase
+      .from('presupuestos')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('mes', mesActual)
+      .eq('año', añoActual)
+    setPresupuestosMes(presupuestos || [])
+
+    // Alertas activas sin revisar
+    const { data: alertas } = await supabase
+      .from('alertas')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('resuelta', false)
+    setAlertasActivas(alertas || [])
 
     const { data: trans } = await supabase
       .from('transacciones')
@@ -404,10 +447,36 @@ export default function Dashboard() {
     </div>
   )
 
+  // --- Cálculos derivados para los KPIs nuevos ---
+
+  const balanceNeto = kpis.total_ingresos - kpis.total_gastos
+
+  const cambioMesAnterior = kpisMesAnterior?.total_gastos > 0
+    ? ((kpis.total_gastos - kpisMesAnterior.total_gastos) / kpisMesAnterior.total_gastos) * 100
+    : null
+
+  const categoriaTop = gastosPorCategoria.length > 0
+    ? [...gastosPorCategoria].sort((a, b) => (b.total_gastado || 0) - (a.total_gastado || 0))[0]
+    : null
+
+  const hoy = new Date()
+  const diaActual = hoy.getDate()
+  const diasEnMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate()
+  const proyeccionMes = diaActual > 0 ? (kpis.total_gastos / diaActual) * diasEnMes : 0
+
+  const totalPresupuestado = presupuestosMes.reduce((acc, p) => acc + Number(p.monto || 0), 0)
+  const idsConPresupuesto = new Set(presupuestosMes.map(p => p.categoria_id))
+  const totalGastadoConPresupuesto = gastosPorCategoria
+    .filter(g => idsConPresupuesto.has(g.categoria_id))
+    .reduce((acc, g) => acc + Number(g.total_gastado || 0), 0)
+  const pctPresupuestoUsado = totalPresupuestado > 0
+    ? (totalGastadoConPresupuesto / totalPresupuestado) * 100
+    : null
+  const montoDisponiblePresupuesto = totalPresupuestado - totalGastadoConPresupuesto
+
   const navItems = [
     { path: '/dashboard', icon: '📊', title: 'Dashboard' },
     { path: '/dashboard/cuentas', icon: '💳', title: 'Cuentas' },
-    { path: '/dashboard/categorias', icon: '⚙️', title: 'Configuración' },
     { path: '/dashboard/transacciones', icon: '💸', title: 'Transacciones' },
     { path: '/dashboard/reportes', icon: '📈', title: 'Reportes' },
     { path: '/dashboard/presupuestos', icon: '🎯', title: 'Presupuestos' },
@@ -435,6 +504,7 @@ export default function Dashboard() {
         />
       )}
 
+      {/* SIDEBAR - Desktop (lateral fija) / Mobile (barra inferior) */}
       <div className="hidden lg:flex fixed left-0 top-0 w-32 h-screen bg-gray-800 border-r border-gray-700 p-4 flex-col items-center gap-6 py-8 z-40">
         <div className="w-10 h-10 rounded-lg bg-orange-500 flex items-center justify-center font-bold text-lg">F</div>
 
@@ -452,6 +522,7 @@ export default function Dashboard() {
         <div className="mt-auto w-10 h-10 rounded-lg bg-gray-700 hover:bg-red-600 transition flex items-center justify-center text-lg cursor-pointer" onClick={cerrarSesion} title="Cerrar sesión">🚪</div>
       </div>
 
+      {/* Bottom nav - Mobile only */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 flex items-center justify-around py-2 px-1 z-40 overflow-x-auto">
         {navItems.map(item => (
           <button
@@ -480,6 +551,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* TRANSACCIONES PENDIENTES */}
         {transaccionesPendientes.length > 0 && (
           <div className="bg-yellow-900/20 border border-yellow-700 rounded-2xl p-4 sm:p-6 mb-6 lg:mb-8">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
@@ -516,6 +588,101 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* RESUMEN DEL MES - Nuevos KPIs */}
+        <div className="mb-6 lg:mb-8">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4">📊 Resumen del mes</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            {/* Balance neto */}
+            <div className="bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-700">
+              <p className="text-gray-400 text-xs sm:text-sm mb-1">Balance neto del mes</p>
+              <p className={`text-xl sm:text-2xl font-bold ${balanceNeto >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {balanceNeto >= 0 ? '+' : ''}{formatMonto(balanceNeto)}
+              </p>
+              <p className="text-gray-500 text-xs mt-1">Ingresos - Gastos</p>
+            </div>
+
+            {/* Comparación vs mes anterior */}
+            <div className="bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-700">
+              <p className="text-gray-400 text-xs sm:text-sm mb-1">Vs. mes anterior</p>
+              {cambioMesAnterior === null ? (
+                <p className="text-gray-500 text-sm">Sin datos del mes pasado</p>
+              ) : (
+                <p className={`text-xl sm:text-2xl font-bold flex items-center gap-1 ${cambioMesAnterior > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {cambioMesAnterior > 0 ? '↑' : '↓'} {Math.abs(cambioMesAnterior).toFixed(0)}%
+                </p>
+              )}
+              <p className="text-gray-500 text-xs mt-1">
+                {cambioMesAnterior === null ? '' : cambioMesAnterior > 0 ? 'Gastaste más' : 'Gastaste menos'}
+              </p>
+            </div>
+
+            {/* Categoría top */}
+            <div className="bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-700">
+              <p className="text-gray-400 text-xs sm:text-sm mb-1">Mayor gasto: categoría</p>
+              {categoriaTop ? (
+                <>
+                  <p className="text-lg sm:text-xl font-bold truncate">
+                    {categoriaTop.icono} {categoriaTop.nombre}
+                  </p>
+                  <p className="text-gray-400 text-xs sm:text-sm mt-1">{formatMonto(categoriaTop.total_gastado)}</p>
+                </>
+              ) : (
+                <p className="text-gray-500 text-sm">Sin gastos este mes</p>
+              )}
+            </div>
+
+            {/* Proyección fin de mes */}
+            <div className="bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-700">
+              <p className="text-gray-400 text-xs sm:text-sm mb-1">Proyección a fin de mes</p>
+              <p className="text-xl sm:text-2xl font-bold text-orange-400">{formatMonto(proyeccionMes)}</p>
+              <p className="text-gray-500 text-xs mt-1">Si mantienes el ritmo actual</p>
+            </div>
+
+            {/* Presupuesto usado */}
+            <div className="bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-700">
+              <p className="text-gray-400 text-xs sm:text-sm mb-1">Presupuesto usado</p>
+              {pctPresupuestoUsado === null ? (
+                <button onClick={() => irA('/dashboard/presupuestos')} className="text-blue-400 text-sm hover:underline">
+                  Configurar presupuestos →
+                </button>
+              ) : (
+                <>
+                  <p className={`text-xl sm:text-2xl font-bold ${pctPresupuestoUsado > 100 ? 'text-red-400' : pctPresupuestoUsado > 80 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    {pctPresupuestoUsado.toFixed(0)}%
+                  </p>
+                  <p className={`text-xs sm:text-sm mt-1 ${montoDisponiblePresupuesto < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                    {montoDisponiblePresupuesto >= 0
+                      ? `Te quedan ${formatMonto(montoDisponiblePresupuesto)}`
+                      : `Te pasaste por ${formatMonto(Math.abs(montoDisponiblePresupuesto))}`}
+                  </p>
+                  <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${pctPresupuestoUsado > 100 ? 'bg-red-500' : pctPresupuestoUsado > 80 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                      style={{ width: `${Math.min(pctPresupuestoUsado, 100)}%` }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Alertas activas */}
+            <div
+              onClick={() => irA('/dashboard/alertas')}
+              className="bg-gray-800 rounded-2xl p-4 sm:p-5 border border-gray-700 cursor-pointer hover:bg-gray-750 transition"
+            >
+              <p className="text-gray-400 text-xs sm:text-sm mb-1">Alertas sin revisar</p>
+              <p className={`text-xl sm:text-2xl font-bold ${alertasActivas.length > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>
+                {alertasActivas.length > 0 ? `⚠️ ${alertasActivas.length}` : '✅ 0'}
+              </p>
+              <p className="text-gray-500 text-xs mt-1">
+                {alertasActivas.length > 0 ? 'Toca para revisar' : 'Todo al día'}
+              </p>
+            </div>
+
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           <div className="lg:col-span-2 space-y-6 lg:space-y-8">
