@@ -10,6 +10,7 @@ export default function Transacciones() {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [editando, setEditando] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [filtroBanco, setFiltroBanco] = useState('todos')
   const [form, setForm] = useState({
     descripcion: '',
     monto: '',
@@ -162,35 +163,64 @@ export default function Transacciones() {
     return tipo === 'gasto' ? `-${formatted}` : `+${formatted}`
   }
 
+  // Lista de bancos únicos, sacada de las cuentas que existen
+  const bancosUnicos = [...new Set(cuentas.map(c => c.banco).filter(Boolean))].sort()
+
+  // Transacciones filtradas por banco seleccionado
+  const transaccionesFiltradas = filtroBanco === 'todos'
+    ? transacciones
+    : transacciones.filter(t => t.cuentas?.banco === filtroBanco)
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-8">
+    <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
 
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 lg:mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Transacciones</h1>
-            <p className="text-gray-400 mt-1">Todos tus movimientos</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">Transacciones</h1>
+            <p className="text-gray-400 mt-1 text-sm sm:text-base">Todos tus movimientos</p>
           </div>
           <div className="flex gap-3">
             <button
               onClick={() => window.location.href = '/dashboard'}
-              className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-xl transition"
+              className="flex-1 sm:flex-none bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-xl transition text-sm sm:text-base"
             >
               ← Volver
             </button>
             <button
               onClick={() => setMostrarForm(!mostrarForm)}
-              className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl transition"
+              className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl transition text-sm sm:text-base"
             >
               + Agregar
             </button>
           </div>
         </div>
 
+        {/* Filtro por banco */}
+        {bancosUnicos.length > 0 && (
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+            <button
+              onClick={() => setFiltroBanco('todos')}
+              className={`px-4 py-2 rounded-xl transition whitespace-nowrap text-sm sm:text-base ${filtroBanco === 'todos' ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+            >
+              Todos los bancos
+            </button>
+            {bancosUnicos.map(banco => (
+              <button
+                key={banco}
+                onClick={() => setFiltroBanco(banco)}
+                className={`px-4 py-2 rounded-xl transition whitespace-nowrap text-sm sm:text-base ${filtroBanco === banco ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+              >
+                {banco}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Formulario nueva transacción */}
         {mostrarForm && (
-          <div className="bg-gray-900 rounded-2xl p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Nueva transacción</h2>
+          <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">Nueva transacción</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-gray-400 text-sm mb-1 block">Descripción</label>
@@ -198,7 +228,7 @@ export default function Transacciones() {
                   placeholder="Ej: Almuerzo Jumbo"
                   value={form.descripcion}
                   onChange={e => setForm({...form, descripcion: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 />
               </div>
               <div>
@@ -208,7 +238,7 @@ export default function Transacciones() {
                   placeholder="Ej: 15000"
                   value={form.monto}
                   onChange={e => setForm({...form, monto: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 />
               </div>
               <div>
@@ -217,7 +247,7 @@ export default function Transacciones() {
                   type="date"
                   value={form.fecha}
                   onChange={e => setForm({...form, fecha: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 />
               </div>
               <div>
@@ -225,7 +255,7 @@ export default function Transacciones() {
                 <select
                   value={form.tipo}
                   onChange={e => setForm({...form, tipo: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 >
                   <option value="gasto">Gasto</option>
                   <option value="ingreso">Ingreso</option>
@@ -236,7 +266,7 @@ export default function Transacciones() {
                 <select
                   value={form.cuenta_id}
                   onChange={e => setForm({...form, cuenta_id: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 >
                   <option value="">Selecciona una cuenta</option>
                   {cuentas.map(c => (
@@ -251,7 +281,7 @@ export default function Transacciones() {
                 <select
                   value={form.categoria_id}
                   onChange={e => setForm({...form, categoria_id: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 >
                   <option value="">Sin categoría — clasificar con IA</option>
                   <optgroup label="Personal">
@@ -267,7 +297,7 @@ export default function Transacciones() {
                 </select>
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <button
                 onClick={agregarTransaccion}
                 disabled={loading}
@@ -286,25 +316,27 @@ export default function Transacciones() {
         )}
 
         {/* Lista de transacciones */}
-        {transacciones.length === 0 ? (
-          <div className="bg-gray-900 rounded-2xl p-12 text-center">
+        {transaccionesFiltradas.length === 0 ? (
+          <div className="bg-gray-900 rounded-2xl p-8 sm:p-12 text-center">
             <p className="text-4xl mb-4">💸</p>
-            <p className="text-gray-400">No hay transacciones aún</p>
+            <p className="text-gray-400">
+              {filtroBanco === 'todos' ? 'No hay transacciones aún' : `No hay transacciones de ${filtroBanco}`}
+            </p>
           </div>
         ) : (
           <div className="bg-gray-900 rounded-2xl overflow-hidden">
-            {transacciones.map((t, i) => (
+            {transaccionesFiltradas.map((t, i) => (
               <div key={t.id}>
                 <div
-                  className={`flex justify-between items-center p-4 ${i !== transacciones.length - 1 ? 'border-b border-gray-800' : ''}`}
+                  className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 p-3 sm:p-4 ${i !== transaccionesFiltradas.length - 1 ? 'border-b border-gray-800' : ''}`}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-lg">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 rounded-full bg-gray-800 flex items-center justify-center text-lg">
                       {t.categorias?.icono || (t.tipo === 'gasto' ? '↓' : '↑')}
                     </div>
-                    <div>
-                      <p className="font-medium">{t.descripcion}</p>
-                      <p className="text-gray-400 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{t.descripcion}</p>
+                      <p className="text-gray-400 text-xs sm:text-sm truncate">
                         {t.cuentas?.banco} · {t.fecha}
                         {t.categorias && ` · ${t.categorias.nombre}`}
                         {t.clasificado_por === 'ia' && (
@@ -316,9 +348,9 @@ export default function Transacciones() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-shrink-0">
                     <div className="text-right">
-                      <p className={`font-semibold ${t.tipo === 'gasto' ? 'text-red-400' : 'text-green-400'}`}>
+                      <p className={`font-semibold text-sm sm:text-base whitespace-nowrap ${t.tipo === 'gasto' ? 'text-red-400' : 'text-green-400'}`}>
                         {formatMonto(t.monto, t.tipo)}
                       </p>
                       {t.necesita_revision && (
@@ -342,16 +374,16 @@ export default function Transacciones() {
 
                 {/* Panel de edición */}
                 {editando === t.id && (
-                  <div className="px-4 pb-4 bg-gray-850 border-b border-gray-800">
+                  <div className="px-3 sm:px-4 pb-4 bg-gray-850 border-b border-gray-800">
                     <div className="bg-gray-800 rounded-xl p-4">
                       <p className="text-gray-400 text-sm mb-2">Corregir categoría:</p>
-                      <div className="flex gap-3">
+                      <div className="flex flex-col sm:flex-row gap-3">
                         <select
                           defaultValue={t.categoria_id || ''}
                           onChange={e => {
                             if (e.target.value) corregirCategoria(t, e.target.value)
                           }}
-                          className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 text-base"
                         >
                           <option value="" disabled>Selecciona categoría...</option>
                           <optgroup label="Personal">
