@@ -11,6 +11,11 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 })
 
+// Flag temporal: la IA no está clasificando bien las categorías, así que
+// por ahora la desactivamos y todo queda como "necesita revisión" en vez
+// de asignar una categoría adivinada. Para reactivarla, cambiar a true.
+const IA_CLASIFICACION_ACTIVADA = false
+
 // Le da más tiempo a esta función antes de que Vercel la corte.
 // Por defecto son 10s, lo cual no alcanza si hay que procesar varios
 // correos (cada uno implica llamadas a Gmail y a la IA).
@@ -411,7 +416,7 @@ REGLAS:
           clasificado_por = 'regla'
           confianza_ia = 1.0
           necesita_revision = false
-        } else if (categorias && categorias.length > 0) {
+        } else if (IA_CLASIFICACION_ACTIVADA && categorias && categorias.length > 0) {
           const listaCategorias = categorias.map(c => c.nombre).join('\n')
 
           const clasificacion = await anthropic.messages.create({

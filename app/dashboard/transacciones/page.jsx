@@ -3,6 +3,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { clasificarTransaccion } from '@/lib/clasificar'
 
+// Flag temporal: la IA no está clasificando bien las categorías, así que
+// por ahora la desactivamos y las transacciones sin categoría manual
+// quedan como "necesita revisión". Para reactivarla, cambiar a true.
+const IA_CLASIFICACION_ACTIVADA = false
+
 export default function Transacciones() {
   const [transacciones, setTransacciones] = useState([])
   const [cuentas, setCuentas] = useState([])
@@ -64,7 +69,7 @@ export default function Transacciones() {
     let necesita_revision = !form.categoria_id
     let confianza_ia = null
 
-    if (!form.categoria_id && categorias.length > 0) {
+    if (IA_CLASIFICACION_ACTIVADA && !form.categoria_id && categorias.length > 0) {
       try {
         const resultado = await clasificarTransaccion(form.descripcion, categorias)
         if (resultado.categoria) {
