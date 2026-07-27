@@ -26,6 +26,60 @@ const ICONOS_TIPO_DEFAULT = {
   empresarial: '🏢'
 }
 
+// Íconos curados para categorías/tipos de finanzas
+const ICONOS_DISPONIBLES = [
+  '🍔', '🍕', '🍜', '🍱', '☕', '🍺', '🍷', '🥗',
+  '🚗', '🚕', '🚌', '🚲', '✈️', '⛽', '🚆', '🛵',
+  '🛒', '🛍️', '👕', '👟', '💄', '👜', '💍', '🧴',
+  '🏠', '🛋️', '🔧', '💡', '🧹', '🛁', '🔑', '🪴',
+  '💊', '🏥', '💉', '🦷', '🏋️', '🧘', '👓', '🩺',
+  '🎬', '🎮', '🎵', '🎨', '🎉', '🎭', '📸', '🎳',
+  '📚', '🎓', '✏️', '🏫', '📖', '🧮', '🔬', '🖥️',
+  '📱', '💻', '🌐', '📺', '🔌', '☁️', '🖨️', '⌚',
+  '💰', '💳', '🏦', '📈', '📉', '💸', '🪙', '💵',
+  '🏭', '📣', '🏢', '👥', '📦', '🛠️', '📋', '🗂️',
+  '👶', '🐶', '🐱', '🎁', '👨‍👩‍👧', '🧸', '🎈', '🐾',
+  '✈️', '🏖️', '🗺️', '🧳', '🏔️', '🚢', '🎡', '🌴',
+  '⚡', '🔥', '💧', '🗑️', '📡', '🛡️', '⭐', '📌'
+]
+
+function SelectorIcono({ valor, onSeleccionar }) {
+  const [abierto, setAbierto] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setAbierto(!abierto)}
+        className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base flex items-center justify-between"
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-xl">{valor || '📦'}</span>
+          <span className="text-[#8891B0] text-sm">Elegir ícono</span>
+        </span>
+        <span className="text-[#5A6288]">{abierto ? '▲' : '▼'}</span>
+      </button>
+
+      {abierto && (
+        <div className="absolute z-10 mt-2 w-full bg-[#131829] border border-[#262E4A] rounded-xl p-3 shadow-2xl max-h-48 overflow-y-auto">
+          <div className="grid grid-cols-8 gap-1">
+            {ICONOS_DISPONIBLES.map((icono, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => { onSeleccionar(icono); setAbierto(false) }}
+                className={`text-xl p-1.5 rounded-lg hover:bg-[#1B2138] transition ${valor === icono ? 'bg-[#7B61FF]/20 ring-1 ring-[#7B61FF]' : ''}`}
+              >
+                {icono}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function EstilosGlobales() {
   return (
     <style jsx global>{`
@@ -273,12 +327,10 @@ export default function Categorias() {
                 <p className="text-[#5A6288] text-xs mt-1">¿No está el tipo que buscas? Créalo primero con "+ Nueva → Nuevo tipo"</p>
               </div>
               <div>
-                <label className="text-[#8891B0] text-sm mb-1 block">Ícono (emoji)</label>
-                <input
-                  placeholder="Ej: 🏋️"
-                  value={formCategoria.icono}
-                  onChange={e => setFormCategoria({...formCategoria, icono: e.target.value})}
-                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
+                <label className="text-[#8891B0] text-sm mb-1 block">Ícono</label>
+                <SelectorIcono
+                  valor={formCategoria.icono}
+                  onSeleccionar={(icono) => setFormCategoria({...formCategoria, icono})}
                 />
               </div>
               <div>
@@ -324,12 +376,10 @@ export default function Categorias() {
                 />
               </div>
               <div>
-                <label className="text-[#8891B0] text-sm mb-1 block">Ícono (emoji)</label>
-                <input
-                  placeholder="Ej: 📈"
-                  value={formTipo.icono}
-                  onChange={e => setFormTipo({...formTipo, icono: e.target.value})}
-                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
+                <label className="text-[#8891B0] text-sm mb-1 block">Ícono</label>
+                <SelectorIcono
+                  valor={formTipo.icono}
+                  onSeleccionar={(icono) => setFormTipo({...formTipo, icono})}
                 />
               </div>
             </div>
