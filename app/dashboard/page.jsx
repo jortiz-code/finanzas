@@ -801,7 +801,6 @@ export default function Dashboard() {
 
   const navItems = [
     { path: '/dashboard', icon: '📊', title: 'Dashboard' },
-    { path: '/dashboard/categorias', icon: '📊', title: 'Dashboard' },
     { path: '/dashboard/cuentas', icon: '💳', title: 'Cuentas' },
     { path: '/dashboard/transacciones', icon: '💸', title: 'Transacciones' },
     { path: '/dashboard/reportes', icon: '📈', title: 'Reportes' },
@@ -1159,8 +1158,8 @@ export default function Dashboard() {
                                   </div>
                                   <div className="w-full bg-[#0B0E1A] rounded-full h-1.5 overflow-hidden">
                                     <div
-                                      className="h-1.5 rounded-full bg-gradient-to-r from-[#7B61FF] to-[#00E5FF]"
-                                      style={{ width: `${porcentajeBarra}%` }}
+                                      className="h-1.5 rounded-full bg-[#00E5FF]"
+                                      style={{ width: `${porcentajeBarra}%`, boxShadow: '0 0 8px rgba(0,229,255,0.8)' }}
                                     />
                                   </div>
                                 </div>
