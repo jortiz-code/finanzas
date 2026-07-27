@@ -1140,7 +1140,7 @@ export default function Dashboard() {
                           <h3 className="text-sm font-semibold font-display capitalize text-[#8891B0]">
                             {obtenerIconoTipoDashboard(tipo)} {tipo}
                           </h3>
-                          <span className="text-xs font-mono text-[#7B61FF]">{formatMonto(subtotalTipo)}</span>
+                          <span className="text-xs font-mono text-[#FF2E9A]">{formatMonto(subtotalTipo)}</span>
                         </div>
 
                         <div className="space-y-3">
@@ -1154,12 +1154,12 @@ export default function Dashboard() {
                                 <div className="min-w-0 flex-1">
                                   <div className="flex justify-between items-center gap-2 mb-1">
                                     <p className="text-sm truncate">{g.nombre}</p>
-                                    <p className="text-sm font-mono text-[#00E5FF] whitespace-nowrap flex-shrink-0">{formatMonto(g.total_gastado)}</p>
+                                    <p className="text-sm font-mono text-[#FF2E9A] whitespace-nowrap flex-shrink-0">{formatMonto(g.total_gastado)}</p>
                                   </div>
                                   <div className="w-full bg-[#0B0E1A] rounded-full h-1.5 overflow-hidden">
                                     <div
-                                      className="h-1.5 rounded-full bg-[#00E5FF]"
-                                      style={{ width: `${porcentajeBarra}%`, boxShadow: '0 0 8px rgba(0,229,255,0.8)' }}
+                                      className="h-1.5 rounded-full bg-[#FF2E9A]"
+                                      style={{ width: `${porcentajeBarra}%`, boxShadow: '0 0 8px rgba(255,46,154,0.8)' }}
                                     />
                                   </div>
                                 </div>
