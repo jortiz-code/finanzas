@@ -1103,6 +1103,52 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+
+            {/* Gastos por categoría */}
+            {gastosPorCategoria.filter(g => g.total_gastado > 0).length > 0 && (
+              <div className="bg-[#131829] rounded-3xl p-4 sm:p-6 lg:p-8 border border-[#262E4A]">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg sm:text-xl font-bold font-display">Gastos por categoría</h2>
+                  <span className="text-[#5A6288] text-xs font-mono uppercase tracking-wide">Este mes</span>
+                </div>
+
+                <div className="space-y-3">
+                  {[...gastosPorCategoria]
+                    .filter(g => g.total_gastado > 0)
+                    .sort((a, b) => b.total_gastado - a.total_gastado)
+                    .map((g, i) => {
+                      const maxGasto = Math.max(...gastosPorCategoria.map(x => x.total_gastado || 0))
+                      const porcentajeBarra = maxGasto > 0 ? (g.total_gastado / maxGasto) * 100 : 0
+                      return (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className="w-9 h-9 flex-shrink-0 rounded-lg bg-[#0B0E1A] border border-[#262E4A] flex items-center justify-center text-base">
+                            {g.icono || '💳'}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex justify-between items-center gap-2 mb-1">
+                              <p className="text-sm truncate">{g.nombre}</p>
+                              <p className="text-sm font-mono text-[#00E5FF] whitespace-nowrap flex-shrink-0">{formatMonto(g.total_gastado)}</p>
+                            </div>
+                            <div className="w-full bg-[#0B0E1A] rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="h-1.5 rounded-full bg-gradient-to-r from-[#7B61FF] to-[#00E5FF]"
+                                style={{ width: `${porcentajeBarra}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+
+                <button
+                  onClick={() => irA('/dashboard/reportes')}
+                  className="w-full mt-6 bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] py-2 rounded-lg text-sm transition text-[#8891B0] hover:text-white"
+                >
+                  Ver reporte completo →
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-6 lg:space-y-8">
