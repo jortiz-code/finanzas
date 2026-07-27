@@ -70,26 +70,30 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
   const [loading, setLoading] = useState(false)
   const [tiposExistentes, setTiposExistentes] = useState(['personal', 'empresarial'])
   const [tiposPersonalizados, setTiposPersonalizados] = useState([])
+  const [mensajeExito, setMensajeExito] = useState('')
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: 'personal', color: '#3b82f6', icono: '📦'
   })
   const [formTipo, setFormTipo] = useState({ nombre: '', icono: '🗂️' })
 
+  const cargarTipos = async () => {
+    const { data: cats } = await supabase.from('categorias').select('tipo')
+    const { data: tipos } = await supabase.from('tipos_categoria').select('*')
+    setTiposPersonalizados(tipos || [])
+    const combinados = [...new Set([
+      'personal', 'empresarial',
+      ...(tipos || []).map(t => t.nombre),
+      ...(cats || []).map(c => c.tipo)
+    ])]
+    setTiposExistentes(combinados)
+    return combinados
+  }
+
   useEffect(() => {
-    const cargarTipos = async () => {
-      const { data: cats } = await supabase.from('categorias').select('tipo')
-      const { data: tipos } = await supabase.from('tipos_categoria').select('*')
-      setTiposPersonalizados(tipos || [])
-      const combinados = [...new Set([
-        'personal', 'empresarial',
-        ...(tipos || []).map(t => t.nombre),
-        ...(cats || []).map(c => c.tipo)
-      ])]
-      setTiposExistentes(combinados)
+    cargarTipos().then(combinados => {
       setFormCategoria(f => ({ ...f, tipo: combinados[0] || 'personal' }))
-    }
-    cargarTipos()
+    })
   }, [])
 
   const obtenerIconoTipo = (tipo) => {
@@ -111,14 +115,21 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
     }).select().single()
 
     setLoading(false)
-    if (!error && data) {
+    if (error) {
+      alert('Error al guardar la categoría: ' + error.message)
+      return
+    }
+    if (data) {
       onCategoriaCreada(data)
     }
   }
 
   const guardarTipo = async () => {
     const nombreLimpio = formTipo.nombre.trim().toLowerCase()
-    if (!nombreLimpio) return
+    if (!nombreLimpio) {
+      alert('Escribe un nombre para el tipo')
+      return
+    }
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -130,11 +141,16 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
 
     setLoading(false)
     if (error) {
-      alert(error.code === '23505' ? 'Ya existe un tipo con ese nombre' : 'Error al guardar')
+      alert(error.code === '23505' ? 'Ya existe un tipo con ese nombre' : 'Error al guardar: ' + error.message)
       return
     }
+
+    await cargarTipos()
     onTipoCreado(nombreLimpio)
+    setFormTipo({ nombre: '', icono: '🗂️' })
+    setMensajeExito(`✅ Tipo "${nombreLimpio}" creado`)
     setPanel('eleccion')
+    setTimeout(() => setMensajeExito(''), 3000)
   }
 
   return (
@@ -144,6 +160,11 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
         {panel === 'eleccion' && (
           <>
             <h2 className="text-lg sm:text-xl font-semibold mb-4">¿Qué quieres agregar?</h2>
+            {mensajeExito && (
+              <div className="bg-green-900/30 border border-green-700 text-green-400 text-sm rounded-xl px-4 py-2 mb-4">
+                {mensajeExito}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 onClick={() => setPanel('categoria')}
