@@ -205,8 +205,275 @@ function SetupModal({ onComplete }) {
   )
 }
 
-// EditarTransaccionModal Component
-function EditarTransaccionModal({ transaccion, categorias, onComplete, onCancel }) {
+const ICONOS_TIPO_DEFAULT = { personal: '👤', empresarial: '🏢' }
+
+const ICONOS_DISPONIBLES = [
+  '🍔', '🍕', '🍜', '🍱', '☕', '🍺', '🍷', '🥗',
+  '🚗', '🚕', '🚌', '🚲', '✈️', '⛽', '🚆', '🛵',
+  '🛒', '🛍️', '👕', '👟', '💄', '👜', '💍', '🧴',
+  '🏠', '🛋️', '🔧', '💡', '🧹', '🛁', '🔑', '🪴',
+  '💊', '🏥', '💉', '🦷', '🏋️', '🧘', '👓', '🩺',
+  '🎬', '🎮', '🎵', '🎨', '🎉', '🎭', '📸', '🎳',
+  '📚', '🎓', '✏️', '🏫', '📖', '🧮', '🔬', '🖥️',
+  '📱', '💻', '🌐', '📺', '🔌', '☁️', '🖨️', '⌚',
+  '💰', '💳', '🏦', '📈', '📉', '💸', '🪙', '💵',
+  '🏭', '📣', '🏢', '👥', '📦', '🛠️', '📋', '🗂️',
+  '👶', '🐶', '🐱', '🎁', '👨‍👩‍👧', '🧸', '🎈', '🐾',
+  '✈️', '🏖️', '🗺️', '🧳', '🏔️', '🚢', '🎡', '🌴',
+  '⚡', '🔥', '💧', '🗑️', '📡', '🛡️', '⭐', '📌'
+]
+
+function SelectorIconoNeon({ valor, onSeleccionar }) {
+  const [abierto, setAbierto] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setAbierto(!abierto)}
+        className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base flex items-center justify-between"
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-xl">{valor || '📦'}</span>
+          <span className="text-[#8891B0] text-sm">Elegir ícono</span>
+        </span>
+        <span className="text-[#5A6288]">{abierto ? '▲' : '▼'}</span>
+      </button>
+
+      {abierto && (
+        <div className="absolute z-20 mt-2 w-full bg-[#131829] border border-[#262E4A] rounded-xl p-3 shadow-2xl max-h-48 overflow-y-auto">
+          <div className="grid grid-cols-8 gap-1">
+            {ICONOS_DISPONIBLES.map((icono, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => { onSeleccionar(icono); setAbierto(false) }}
+                className={`text-xl p-1.5 rounded-lg hover:bg-[#1B2138] transition ${valor === icono ? 'bg-[#7B61FF]/20 ring-1 ring-[#7B61FF]' : ''}`}
+              >
+                {icono}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Modal para crear categoría/tipo nuevo, con la misma paleta neón del dashboard
+function ModalNuevaCategoriaNeon({ onCerrar, onCategoriaCreada }) {
+  const [panel, setPanel] = useState('eleccion')
+  const [loading, setLoading] = useState(false)
+  const [tiposExistentes, setTiposExistentes] = useState(['personal', 'empresarial'])
+  const [tiposPersonalizados, setTiposPersonalizados] = useState([])
+  const [mensajeExito, setMensajeExito] = useState('')
+
+  const [formCategoria, setFormCategoria] = useState({
+    nombre: '', tipo: 'personal', color: '#00E5FF', icono: '📦'
+  })
+  const [formTipo, setFormTipo] = useState({ nombre: '', icono: '🗂️' })
+
+  const cargarTipos = async () => {
+    const { data: cats } = await supabase.from('categorias').select('tipo')
+    const { data: tipos } = await supabase.from('tipos_categoria').select('*')
+    setTiposPersonalizados(tipos || [])
+    const combinados = [...new Set([
+      'personal', 'empresarial',
+      ...(tipos || []).map(t => t.nombre),
+      ...(cats || []).map(c => c.tipo)
+    ])]
+    setTiposExistentes(combinados)
+    return combinados
+  }
+
+  useEffect(() => {
+    cargarTipos().then(combinados => {
+      setFormCategoria(f => ({ ...f, tipo: combinados[0] || 'personal' }))
+    })
+  }, [])
+
+  const obtenerIconoTipo = (tipo) => {
+    if (ICONOS_TIPO_DEFAULT[tipo]) return ICONOS_TIPO_DEFAULT[tipo]
+    return tiposPersonalizados.find(t => t.nombre === tipo)?.icono || '🗂️'
+  }
+
+  const guardarCategoria = async () => {
+    if (!formCategoria.nombre) return
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { data, error } = await supabase.from('categorias').insert({
+      nombre: formCategoria.nombre,
+      tipo: formCategoria.tipo,
+      color: formCategoria.color,
+      icono: formCategoria.icono,
+      user_id: user.id
+    }).select().single()
+
+    setLoading(false)
+    if (error) {
+      alert('Error al guardar la categoría: ' + error.message)
+      return
+    }
+    if (data) onCategoriaCreada(data)
+  }
+
+  const guardarTipo = async () => {
+    const nombreLimpio = formTipo.nombre.trim().toLowerCase()
+    if (!nombreLimpio) {
+      alert('Escribe un nombre para el tipo')
+      return
+    }
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { error } = await supabase.from('tipos_categoria').insert({
+      user_id: user.id,
+      nombre: nombreLimpio,
+      icono: formTipo.icono || '🗂️'
+    })
+
+    setLoading(false)
+    if (error) {
+      alert(error.code === '23505' ? 'Ya existe un tipo con ese nombre' : 'Error al guardar: ' + error.message)
+      return
+    }
+
+    await cargarTipos()
+    setFormTipo({ nombre: '', icono: '🗂️' })
+    setMensajeExito(`✅ Tipo "${nombreLimpio}" creado`)
+    setPanel('eleccion')
+    setTimeout(() => setMensajeExito(''), 3000)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 font-body">
+      <div className="bg-[#131829] rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#262E4A] shadow-2xl max-h-[90vh] overflow-y-auto glow-violeta">
+
+        {panel === 'eleccion' && (
+          <>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-white">¿Qué quieres agregar?</h2>
+            {mensajeExito && (
+              <div className="bg-[#00E5FF]/10 border border-[#00E5FF]/40 text-[#00E5FF] text-sm rounded-xl px-4 py-2 mb-4">
+                {mensajeExito}
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={() => setPanel('categoria')}
+                className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#00E5FF] rounded-2xl p-5 text-left transition group"
+              >
+                <p className="text-3xl mb-2">🏷️</p>
+                <p className="font-semibold font-display text-white group-hover:text-[#00E5FF] transition">Nueva categoría</p>
+                <p className="text-[#8891B0] text-sm mt-1">Ej: Gimnasio, Mascotas, Netflix</p>
+              </button>
+              <button
+                onClick={() => setPanel('tipo')}
+                className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#7B61FF] rounded-2xl p-5 text-left transition group"
+              >
+                <p className="text-3xl mb-2">📂</p>
+                <p className="font-semibold font-display text-white group-hover:text-[#7B61FF] transition">Nuevo tipo</p>
+                <p className="text-[#8891B0] text-sm mt-1">Ej: Inversiones, Familiar, Ahorro</p>
+              </button>
+            </div>
+            <button onClick={onCerrar} className="mt-4 text-[#8891B0] hover:text-white text-sm transition">
+              Cancelar
+            </button>
+          </>
+        )}
+
+        {panel === 'categoria' && (
+          <>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-white">Nueva categoría</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8891B0] text-sm mb-1 block">Nombre</label>
+                <input
+                  placeholder="Ej: Gimnasio"
+                  value={formCategoria.nombre}
+                  onChange={e => setFormCategoria({...formCategoria, nombre: e.target.value})}
+                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base"
+                />
+              </div>
+              <div>
+                <label className="text-[#8891B0] text-sm mb-1 block">Tipo</label>
+                <select
+                  value={formCategoria.tipo}
+                  onChange={e => setFormCategoria({...formCategoria, tipo: e.target.value})}
+                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base capitalize"
+                >
+                  {tiposExistentes.map(t => (
+                    <option key={t} value={t}>{obtenerIconoTipo(t)} {t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[#8891B0] text-sm mb-1 block">Ícono</label>
+                <SelectorIconoNeon valor={formCategoria.icono} onSeleccionar={(icono) => setFormCategoria({...formCategoria, icono})} />
+              </div>
+              <div>
+                <label className="text-[#8891B0] text-sm mb-1 block">Color</label>
+                <input
+                  type="color"
+                  value={formCategoria.color}
+                  onChange={e => setFormCategoria({...formCategoria, color: e.target.value})}
+                  className="w-full bg-[#0B0E1A] rounded-xl px-2 py-2 outline-none h-12 border border-[#262E4A]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={guardarCategoria}
+                disabled={loading}
+                className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
+              >
+                {loading ? 'Guardando...' : 'Guardar'}
+              </button>
+              <button onClick={() => setPanel('eleccion')} className="bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition text-white">
+                ← Volver
+              </button>
+            </div>
+          </>
+        )}
+
+        {panel === 'tipo' && (
+          <>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-white">Nuevo tipo</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8891B0] text-sm mb-1 block">Nombre del tipo</label>
+                <input
+                  placeholder="Ej: Inversiones"
+                  value={formTipo.nombre}
+                  onChange={e => setFormTipo({...formTipo, nombre: e.target.value})}
+                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base"
+                />
+              </div>
+              <div>
+                <label className="text-[#8891B0] text-sm mb-1 block">Ícono</label>
+                <SelectorIconoNeon valor={formTipo.icono} onSeleccionar={(icono) => setFormTipo({...formTipo, icono})} />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={guardarTipo}
+                disabled={loading}
+                className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
+              >
+                {loading ? 'Guardando...' : 'Guardar'}
+              </button>
+              <button onClick={() => setPanel('eleccion')} className="bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition text-white">
+                ← Volver
+              </button>
+            </div>
+          </>
+        )}
+
+      </div>
+    </div>
+  )
+}
+function EditarTransaccionModal({ transaccion, categorias, onComplete, onCancel, onSolicitarNuevaCategoria, categoriaRecienCreada, onCategoriaInyectada }) {
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
     descripcion: transaccion?.descripcion || '',
@@ -215,6 +482,13 @@ function EditarTransaccionModal({ transaccion, categorias, onComplete, onCancel 
     fecha: transaccion?.fecha || '',
     categoria_id: transaccion?.categoria_id || ''
   })
+
+  useEffect(() => {
+    if (categoriaRecienCreada) {
+      setForm(f => ({ ...f, categoria_id: categoriaRecienCreada.id }))
+      onCategoriaInyectada()
+    }
+  }, [categoriaRecienCreada])
 
   const guardar = async () => {
     setLoading(true)
@@ -235,6 +509,14 @@ function EditarTransaccionModal({ transaccion, categorias, onComplete, onCancel 
     } else {
       alert('Error al actualizar')
     }
+  }
+
+  const manejarCambioCategoria = (valor) => {
+    if (valor === '__nueva__') {
+      onSolicitarNuevaCategoria()
+      return
+    }
+    setForm({ ...form, categoria_id: valor })
   }
 
   return (
@@ -267,13 +549,14 @@ function EditarTransaccionModal({ transaccion, categorias, onComplete, onCancel 
             <label className="text-[#8891B0] text-sm mb-2 block">Categoría</label>
             <select
               value={form.categoria_id}
-              onChange={e => setForm({...form, categoria_id: e.target.value})}
+              onChange={e => manejarCambioCategoria(e.target.value)}
               className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
             >
               <option value="">Selecciona una categoría</option>
               {categorias.map(c => (
                 <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
               ))}
+              <option value="__nueva__">+ Agregar nueva categoría</option>
             </select>
           </div>
 
@@ -336,6 +619,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [mostrarSetup, setMostrarSetup] = useState(false)
   const [transaccionEditando, setTransaccionEditando] = useState(null)
+  const [mostrarModalCategoria, setMostrarModalCategoria] = useState(false)
+  const [categoriaRecienCreada, setCategoriaRecienCreada] = useState(null)
 
   const mesActual = new Date().getMonth() + 1
   const añoActual = new Date().getFullYear()
@@ -476,7 +761,6 @@ export default function Dashboard() {
     </div>
   )
 
-  // --- Cálculos derivados ---
   const balanceNeto = kpis.total_ingresos - kpis.total_gastos
 
   const cambioMesAnterior = kpisMesAnterior?.total_gastos > 0
@@ -506,7 +790,6 @@ export default function Dashboard() {
 
   const navItems = [
     { path: '/dashboard', icon: '📊', title: 'Dashboard' },
-    { path: '/dashboard/categorias', icon: '📊', title: 'Dashboard' },
     { path: '/dashboard/cuentas', icon: '💳', title: 'Cuentas' },
     { path: '/dashboard/transacciones', icon: '💸', title: 'Transacciones' },
     { path: '/dashboard/reportes', icon: '📈', title: 'Reportes' },
@@ -534,6 +817,21 @@ export default function Dashboard() {
             window.location.reload()
           }}
           onCancel={() => setTransaccionEditando(null)}
+          onSolicitarNuevaCategoria={() => setMostrarModalCategoria(true)}
+          categoriaRecienCreada={categoriaRecienCreada}
+          onCategoriaInyectada={() => setCategoriaRecienCreada(null)}
+        />
+      )}
+
+      {mostrarModalCategoria && (
+        <ModalNuevaCategoriaNeon
+          onCerrar={() => setMostrarModalCategoria(false)}
+          onCategoriaCreada={async (nuevaCategoria) => {
+            const { data: cats } = await supabase.from('categorias').select('*')
+            setCategorias(cats || [])
+            setCategoriaRecienCreada(nuevaCategoria)
+            setMostrarModalCategoria(false)
+          }}
         />
       )}
 
@@ -625,7 +923,6 @@ export default function Dashboard() {
 
         {/* HERO - Balance neto */}
         <div className="relative bg-[#131829] border border-[#262E4A] rounded-3xl p-6 sm:p-8 lg:p-10 mb-4 overflow-hidden">
-          {/* Línea de pulso decorativa de fondo */}
           <svg className="absolute inset-x-0 bottom-0 w-full h-24 opacity-40" viewBox="0 0 400 60" preserveAspectRatio="none">
             <defs>
               <linearGradient id="pulsoHeroGrad" x1="0" y1="0" x2="1" y2="0">
@@ -657,7 +954,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Chips satélite - 4 KPIs restantes */}
+        {/* Chips satélite */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 lg:mb-8">
 
           <div className="bg-[#131829] rounded-2xl p-4 border border-[#262E4A] hover:border-[#7B61FF]/50 transition">
@@ -724,7 +1021,6 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           <div className="lg:col-span-2 space-y-6 lg:space-y-8">
 
-            {/* Gráfico estilo osciloscopio */}
             <div className="bg-[#131829] rounded-3xl p-4 sm:p-6 lg:p-8 border border-[#262E4A]">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
                 <h2 className="text-lg sm:text-xl font-bold font-display">Ingresos · últimos 6 meses</h2>
@@ -754,9 +1050,7 @@ export default function Dashboard() {
                     contentStyle={{ backgroundColor: '#0B0E1A', border: '1px solid #262E4A', borderRadius: '8px', fontFamily: 'JetBrains Mono' }}
                     labelStyle={{ color: '#8891B0' }}
                   />
-                  {/* Glow: linea gruesa translucida detras */}
                   <Line type="monotone" dataKey="income" stroke="#00E5FF" strokeWidth={8} strokeOpacity={0.18} dot={false} isAnimationActive={false} />
-                  {/* Linea nitida encima */}
                   <Line type="monotone" dataKey="income" stroke="url(#lineaPulso)" strokeWidth={2.5} dot={{ r: 3, fill: '#00E5FF', strokeWidth: 0 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -766,7 +1060,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Ledger de transacciones recientes */}
             <div className="bg-[#131829] rounded-3xl p-4 sm:p-6 lg:p-8 border border-[#262E4A]">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-lg sm:text-xl font-bold font-display">Movimientos recientes</h2>
