@@ -166,6 +166,11 @@ export default function Categorias() {
     setPanelActivo('categoria')
   }
 
+  const abrirFormCategoriaConTipo = (tipo) => {
+    setFormCategoria({ nombre: '', tipo, color: '#00E5FF', icono: '📦' })
+    setPanelActivo('categoria')
+  }
+
   const abrirFormTipo = () => {
     setFormTipo({ nombre: '', icono: '🗂️' })
     setPanelActivo('tipo')
@@ -231,7 +236,6 @@ export default function Categorias() {
 
   const categoriasPorTipo = tiposExistentes
     .map(tipo => ({ tipo, items: categorias.filter(c => c.tipo === tipo) }))
-    .filter(grupo => grupo.items.length > 0)
 
   return (
     <div className="min-h-screen bg-[#0B0E1A] text-white p-4 sm:p-6 lg:p-8 font-body">
@@ -401,55 +405,71 @@ export default function Categorias() {
           </div>
         )}
 
-        {/* Tipos sin categorías todavía (creados pero vacíos) */}
-        {tiposPersonalizados.filter(t => !categorias.some(c => c.tipo === t.nombre)).length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-[#8891B0]">Tipos sin categorías aún</h2>
-            <div className="flex flex-wrap gap-2">
-              {tiposPersonalizados.filter(t => !categorias.some(c => c.tipo === t.nombre)).map(t => (
-                <div key={t.id} className="flex items-center gap-2 bg-[#131829] border border-[#262E4A] rounded-xl px-3 py-2">
-                  <span>{t.icono}</span>
-                  <span className="capitalize text-sm">{t.nombre}</span>
-                  <button onClick={() => eliminarTipo(t)} className="text-[#5A6288] hover:text-[#FF2E9A] transition">×</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Categorías agrupadas por tipo (siempre se muestran todos los tipos) */}
+        {categoriasPorTipo.map(grupo => {
+          const esTipoPersonalizado = tiposPersonalizados.some(t => t.nombre === grupo.tipo)
+          const tipoVacio = grupo.items.length === 0
 
-        {/* Categorías agrupadas por tipo */}
-        {categoriasPorTipo.map(grupo => (
-          <div key={grupo.tipo} className="mb-8">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display capitalize">
-              {obtenerIconoTipo(grupo.tipo)} {grupo.tipo}
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {grupo.items.map(cat => (
-                <div
-                  key={cat.id}
-                  className="bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A]"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-2xl flex-shrink-0">{cat.icono}</span>
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm truncate font-display">{cat.nombre}</p>
-                      <div
-                        className="w-3 h-3 rounded-full mt-1"
-                        style={{ backgroundColor: cat.color }}
-                      />
-                    </div>
-                  </div>
+          return (
+            <div key={grupo.tipo} className="mb-8">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg sm:text-xl font-semibold font-display capitalize flex items-center gap-2">
+                  {obtenerIconoTipo(grupo.tipo)} {grupo.tipo}
+                  {tipoVacio && <span className="text-[#5A6288] text-xs font-normal font-mono">(sin categorías)</span>}
+                </h2>
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => eliminarCategoria(cat)}
-                    className="text-[#5A6288] hover:text-[#FF2E9A] transition flex-shrink-0"
+                    onClick={() => abrirFormCategoriaConTipo(grupo.tipo)}
+                    className="bg-[#131829] hover:bg-[#1B2138] border border-[#262E4A] hover:border-[#00E5FF] text-[#00E5FF] px-3 py-1.5 rounded-lg text-xs sm:text-sm transition whitespace-nowrap"
                   >
-                    ×
+                    + Nueva categoría
                   </button>
+                  {esTipoPersonalizado && tipoVacio && (
+                    <button
+                      onClick={() => eliminarTipo(tiposPersonalizados.find(t => t.nombre === grupo.tipo))}
+                      className="text-[#5A6288] hover:text-[#FF2E9A] transition text-sm px-1"
+                      title="Eliminar tipo"
+                    >
+                      🗑️
+                    </button>
+                  )}
                 </div>
-              ))}
+              </div>
+
+              {tipoVacio ? (
+                <div className="bg-[#131829]/50 border border-dashed border-[#262E4A] rounded-2xl p-6 text-center">
+                  <p className="text-[#5A6288] text-sm">Aún no tienes categorías en "{grupo.tipo}"</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {grupo.items.map(cat => (
+                    <div
+                      key={cat.id}
+                      className="bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A]"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-2xl flex-shrink-0">{cat.icono}</span>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate font-display">{cat.nombre}</p>
+                          <div
+                            className="w-3 h-3 rounded-full mt-1"
+                            style={{ backgroundColor: cat.color }}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => eliminarCategoria(cat)}
+                        className="text-[#5A6288] hover:text-[#FF2E9A] transition flex-shrink-0"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {categorias.length === 0 && tiposPersonalizados.length === 0 && (
           <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-8 sm:p-12 text-center">
