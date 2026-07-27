@@ -688,114 +688,117 @@ export default function Transacciones() {
           </div>
         )}
 
-        {/* Formulario nueva transacción */}
+        {/* Modal: Nueva transacción */}
         {mostrarForm && (
-          <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-6">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4">Nueva transacción</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Descripción</label>
-                <input
-                  placeholder="Ej: Almuerzo Jumbo"
-                  value={form.descripcion}
-                  onChange={e => setForm({...form, descripcion: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                />
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Monto (CLP)</label>
-                <input
-                  type="number"
-                  placeholder="Ej: 15000"
-                  value={form.monto}
-                  onChange={e => setForm({...form, monto: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                />
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Fecha</label>
-                <input
-                  type="date"
-                  value={form.fecha}
-                  onChange={e => setForm({...form, fecha: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                />
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Tipo</label>
-                <select
-                  value={form.tipo}
-                  onChange={e => setForm({...form, tipo: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                >
-                  <option value="gasto">Gasto</option>
-                  <option value="ingreso">Ingreso</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Cuenta</label>
-                <select
-                  value={form.cuenta_id}
-                  onChange={e => setForm({...form, cuenta_id: e.target.value})}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                >
-                  <option value="">Selecciona una cuenta</option>
-                  {cuentas.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre} — {c.banco}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">
-                  Categoría <span className="text-gray-600">(opcional{IA_CLASIFICACION_ACTIVADA ? ' — la IA la detecta sola' : ''})</span>
-                </label>
-                <select
-                  value={form.categoria_id}
-                  onChange={e => {
-                    if (e.target.value === '__nueva__') {
-                      abrirModalCategoria('form')
-                      return
-                    }
-                    setForm({...form, categoria_id: e.target.value})
-                  }}
-                  className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                >
-                  <option value="">{IA_CLASIFICACION_ACTIVADA ? 'Sin categoría — clasificar con IA' : 'Sin categoría — marcar para revisar'}</option>
-                  <optgroup label="Personal">
-                    {categoriasPersonales.map(c => (
-                      <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-40 p-4">
+            <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 max-w-md w-full border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4">Nueva transacción</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Descripción</label>
+                  <input
+                    placeholder="Ej: Almuerzo Jumbo"
+                    value={form.descripcion}
+                    onChange={e => setForm({...form, descripcion: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Monto (CLP)</label>
+                  <input
+                    type="number"
+                    placeholder="Ej: 15000"
+                    value={form.monto}
+                    onChange={e => setForm({...form, monto: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Fecha</label>
+                  <input
+                    type="date"
+                    value={form.fecha}
+                    onChange={e => setForm({...form, fecha: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Tipo</label>
+                  <select
+                    value={form.tipo}
+                    onChange={e => setForm({...form, tipo: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  >
+                    <option value="gasto">Gasto</option>
+                    <option value="ingreso">Ingreso</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Cuenta</label>
+                  <select
+                    value={form.cuenta_id}
+                    onChange={e => setForm({...form, cuenta_id: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  >
+                    <option value="">Selecciona una cuenta</option>
+                    {cuentas.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre} — {c.banco}</option>
                     ))}
-                  </optgroup>
-                  <optgroup label="Empresarial">
-                    {categoriasEmpresariales.map(c => (
-                      <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
-                    ))}
-                  </optgroup>
-                  {categoriasOtrosTipos.length > 0 && (
-                    <optgroup label="Otros tipos">
-                      {categoriasOtrosTipos.map(c => (
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">
+                    Categoría <span className="text-gray-600">(opcional{IA_CLASIFICACION_ACTIVADA ? ' — la IA la detecta sola' : ''})</span>
+                  </label>
+                  <select
+                    value={form.categoria_id}
+                    onChange={e => {
+                      if (e.target.value === '__nueva__') {
+                        abrirModalCategoria('form')
+                        return
+                      }
+                      setForm({...form, categoria_id: e.target.value})
+                    }}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  >
+                    <option value="">{IA_CLASIFICACION_ACTIVADA ? 'Sin categoría — clasificar con IA' : 'Sin categoría — marcar para revisar'}</option>
+                    <optgroup label="Personal">
+                      {categoriasPersonales.map(c => (
                         <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
                       ))}
                     </optgroup>
-                  )}
-                  <option value="__nueva__">+ Agregar nueva categoría</option>
-                </select>
+                    <optgroup label="Empresarial">
+                      {categoriasEmpresariales.map(c => (
+                        <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                      ))}
+                    </optgroup>
+                    {categoriasOtrosTipos.length > 0 && (
+                      <optgroup label="Otros tipos">
+                        {categoriasOtrosTipos.map(c => (
+                          <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="__nueva__">+ Agregar nueva categoría</option>
+                  </select>
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 mt-4">
-              <button
-                onClick={agregarTransaccion}
-                disabled={loading}
-                className="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-xl transition"
-              >
-                {loading ? (IA_CLASIFICACION_ACTIVADA ? '🤖 Clasificando...' : 'Guardando...') : 'Guardar'}
-              </button>
-              <button
-                onClick={() => setMostrarForm(false)}
-                className="bg-gray-800 hover:bg-gray-700 px-6 py-2 rounded-xl transition"
-              >
-                Cancelar
-              </button>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setMostrarForm(false)}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 font-bold py-3 rounded-xl transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={agregarTransaccion}
+                  disabled={loading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 font-bold py-3 rounded-xl transition"
+                >
+                  {loading ? (IA_CLASIFICACION_ACTIVADA ? '🤖 Clasificando...' : 'Guardando...') : 'Guardar'}
+                </button>
+              </div>
             </div>
           </div>
         )}
