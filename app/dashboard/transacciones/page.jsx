@@ -286,7 +286,6 @@ export default function Transacciones() {
   const [cuentas, setCuentas] = useState([])
   const [categorias, setCategorias] = useState([])
   const [mostrarForm, setMostrarForm] = useState(false)
-  const [editando, setEditando] = useState(null)
   const [loading, setLoading] = useState(false)
   const [filtroBanco, setFiltroBanco] = useState('todos')
   const [form, setForm] = useState({
@@ -298,10 +297,18 @@ export default function Transacciones() {
     categoria_id: ''
   })
 
+  // Edición de transacción existente: modal completo con todos los campos,
+  // igual que el formulario de "Nueva transacción"
+  const [transaccionEditandoId, setTransaccionEditandoId] = useState(null)
+  const [formEditar, setFormEditar] = useState({
+    descripcion: '', monto: '', fecha: '', tipo: 'gasto', cuenta_id: '', categoria_id: ''
+  })
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false)
+
   // Modal de nueva categoría/tipo: 'origenModalCategoria' guarda de dónde
-  // se abrió, para saber qué hacer cuando se crea la categoría:
-  // 'form' = el formulario de nueva transacción
-  // objeto transacción = el editor inline de una transacción existente
+  // se abrió, para saber a qué formulario devolverle la categoría creada:
+  // 'form' = formulario de nueva transacción
+  // 'editar' = modal de edición de una transacción existente
   const [mostrarModalCategoria, setMostrarModalCategoria] = useState(false)
   const [origenModalCategoria, setOrigenModalCategoria] = useState(null)
 
@@ -397,40 +404,77 @@ export default function Transacciones() {
     setLoading(false)
   }
 
-  const corregirCategoria = async (transaccion, categoria_id) => {
+  // --- Edición de transacción existente ---
+
+  const abrirEditor = (t) => {
+    setTransaccionEditandoId(t.id)
+    setFormEditar({
+      descripcion: t.descripcion || '',
+      monto: t.monto || '',
+      fecha: t.fecha || '',
+      tipo: t.tipo || 'gasto',
+      cuenta_id: t.cuenta_id || '',
+      categoria_id: t.categoria_id || ''
+    })
+  }
+
+  const cerrarEditor = () => {
+    setTransaccionEditandoId(null)
+  }
+
+  const guardarEdicion = async () => {
+    if (!formEditar.descripcion || !formEditar.monto) return
+    setGuardandoEdicion(true)
+
     const { data: { user } } = await supabase.auth.getUser()
 
-    await supabase.from('transacciones').update({
-      categoria_id,
-      clasificado_por: 'usuario',
-      necesita_revision: false
-    }).eq('id', transaccion.id)
+    const { error } = await supabase.from('transacciones').update({
+      descripcion: formEditar.descripcion,
+      monto: parseFloat(formEditar.monto),
+      fecha: formEditar.fecha,
+      tipo: formEditar.tipo,
+      cuenta_id: formEditar.cuenta_id || null,
+      categoria_id: formEditar.categoria_id || null,
+      clasificado_por: formEditar.categoria_id ? 'usuario' : null,
+      necesita_revision: !formEditar.categoria_id
+    }).eq('id', transaccionEditandoId)
 
-    const { data: reglaExistente } = await supabase
-      .from('reglas_ia')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('patron', transaccion.descripcion)
-      .single()
-
-    if (reglaExistente) {
-      await supabase.from('reglas_ia').update({
-        categoria_id,
-        veces_usado: reglaExistente.veces_usado + 1
-      }).eq('id', reglaExistente.id)
-    } else {
-      await supabase.from('reglas_ia').insert({
-        user_id: user.id,
-        patron: transaccion.descripcion,
-        categoria_id
-      })
+    if (error) {
+      setGuardandoEdicion(false)
+      alert('Error al guardar los cambios: ' + error.message)
+      return
     }
 
-    setEditando(null)
+    // Si se asignó categoría manualmente, guardamos/actualizamos la regla
+    // para que la próxima vez que aparezca este mismo comercio se clasifique solo.
+    if (formEditar.categoria_id) {
+      const { data: reglaExistente } = await supabase
+        .from('reglas_ia')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('patron', formEditar.descripcion)
+        .single()
+
+      if (reglaExistente) {
+        await supabase.from('reglas_ia').update({
+          categoria_id: formEditar.categoria_id,
+          veces_usado: reglaExistente.veces_usado + 1
+        }).eq('id', reglaExistente.id)
+      } else {
+        await supabase.from('reglas_ia').insert({
+          user_id: user.id,
+          patron: formEditar.descripcion,
+          categoria_id: formEditar.categoria_id
+        })
+      }
+    }
+
+    setGuardandoEdicion(false)
+    setTransaccionEditandoId(null)
     cargarDatos()
   }
 
-  // Se llama cuando el select de categoría (en cualquiera de los 3 lugares)
+  // Se llama cuando el select de categoría (nueva transacción o edición)
   // recibe la opción "+ Agregar nueva categoría"
   const abrirModalCategoria = (origen) => {
     setOrigenModalCategoria(origen)
@@ -438,13 +482,12 @@ export default function Transacciones() {
   }
 
   const manejarCategoriaCreada = async (nuevaCategoria) => {
-    const catsActualizadas = await cargarDatos()
+    await cargarDatos()
 
     if (origenModalCategoria === 'form') {
       setForm(f => ({ ...f, categoria_id: nuevaCategoria.id }))
-    } else if (origenModalCategoria && origenModalCategoria.id) {
-      // era una transacción existente (editor inline)
-      await corregirCategoria(origenModalCategoria, nuevaCategoria.id)
+    } else if (origenModalCategoria === 'editar') {
+      setFormEditar(f => ({ ...f, categoria_id: nuevaCategoria.id }))
     }
 
     setMostrarModalCategoria(false)
@@ -452,9 +495,6 @@ export default function Transacciones() {
   }
 
   const manejarTipoCreado = async () => {
-    // Solo se creó un tipo (no una categoría), refrescamos y dejamos el
-    // modal abierto en la pantalla de elección para que puedan seguir
-    // y crear la categoría de ese tipo nuevo si quieren.
     await cargarDatos()
   }
 
@@ -478,6 +518,10 @@ export default function Transacciones() {
     ? transacciones
     : transacciones.filter(t => t.cuentas?.banco === filtroBanco)
 
+  const categoriasPersonales = categorias.filter(c => c.tipo === 'personal')
+  const categoriasEmpresariales = categorias.filter(c => c.tipo === 'empresarial')
+  const categoriasOtrosTipos = categorias.filter(c => c.tipo !== 'personal' && c.tipo !== 'empresarial')
+
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
@@ -488,6 +532,118 @@ export default function Transacciones() {
             onCategoriaCreada={manejarCategoriaCreada}
             onTipoCreado={manejarTipoCreado}
           />
+        )}
+
+        {/* Modal de edición completa de transacción */}
+        {transaccionEditandoId && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-40 p-4">
+            <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 max-w-md w-full border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4">Editar transacción</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Descripción</label>
+                  <input
+                    value={formEditar.descripcion}
+                    onChange={e => setFormEditar({...formEditar, descripcion: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Monto (CLP)</label>
+                  <input
+                    type="number"
+                    value={formEditar.monto}
+                    onChange={e => setFormEditar({...formEditar, monto: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Fecha</label>
+                  <input
+                    type="date"
+                    value={formEditar.fecha}
+                    onChange={e => setFormEditar({...formEditar, fecha: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Tipo</label>
+                  <select
+                    value={formEditar.tipo}
+                    onChange={e => setFormEditar({...formEditar, tipo: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  >
+                    <option value="gasto">Gasto</option>
+                    <option value="ingreso">Ingreso</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Cuenta</label>
+                  <select
+                    value={formEditar.cuenta_id}
+                    onChange={e => setFormEditar({...formEditar, cuenta_id: e.target.value})}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  >
+                    <option value="">Selecciona una cuenta</option>
+                    {cuentas.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre} — {c.banco}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Categoría</label>
+                  <select
+                    value={formEditar.categoria_id}
+                    onChange={e => {
+                      if (e.target.value === '__nueva__') {
+                        abrirModalCategoria('editar')
+                        return
+                      }
+                      setFormEditar({...formEditar, categoria_id: e.target.value})
+                    }}
+                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                  >
+                    <option value="">Sin categoría</option>
+                    <optgroup label="Personal">
+                      {categoriasPersonales.map(c => (
+                        <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Empresarial">
+                      {categoriasEmpresariales.map(c => (
+                        <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                      ))}
+                    </optgroup>
+                    {categoriasOtrosTipos.length > 0 && (
+                      <optgroup label="Otros tipos">
+                        {categoriasOtrosTipos.map(c => (
+                          <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="__nueva__">+ Agregar nueva categoría</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={cerrarEditor}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 font-bold py-3 rounded-xl transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={guardarEdicion}
+                  disabled={guardandoEdicion}
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 font-bold py-3 rounded-xl transition"
+                >
+                  {guardandoEdicion ? 'Guardando...' : 'Guardar cambios'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 lg:mb-8">
@@ -606,18 +762,18 @@ export default function Transacciones() {
                 >
                   <option value="">{IA_CLASIFICACION_ACTIVADA ? 'Sin categoría — clasificar con IA' : 'Sin categoría — marcar para revisar'}</option>
                   <optgroup label="Personal">
-                    {categorias.filter(c => c.tipo === 'personal').map(c => (
+                    {categoriasPersonales.map(c => (
                       <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
                     ))}
                   </optgroup>
                   <optgroup label="Empresarial">
-                    {categorias.filter(c => c.tipo === 'empresarial').map(c => (
+                    {categoriasEmpresariales.map(c => (
                       <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
                     ))}
                   </optgroup>
-                  {categorias.filter(c => c.tipo !== 'personal' && c.tipo !== 'empresarial').length > 0 && (
+                  {categoriasOtrosTipos.length > 0 && (
                     <optgroup label="Otros tipos">
-                      {categorias.filter(c => c.tipo !== 'personal' && c.tipo !== 'empresarial').map(c => (
+                      {categoriasOtrosTipos.map(c => (
                         <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
                       ))}
                     </optgroup>
@@ -655,99 +811,50 @@ export default function Transacciones() {
         ) : (
           <div className="bg-gray-900 rounded-2xl overflow-hidden">
             {transaccionesFiltradas.map((t, i) => (
-              <div key={t.id}>
-                <div
-                  className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 p-3 sm:p-4 ${i !== transaccionesFiltradas.length - 1 ? 'border-b border-gray-800' : ''}`}
-                >
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 rounded-full bg-gray-800 flex items-center justify-center text-lg">
-                      {t.categorias?.icono || (t.tipo === 'gasto' ? '↓' : '↑')}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{t.descripcion}</p>
-                      <p className="text-gray-400 text-xs sm:text-sm truncate">
-                        {t.cuentas?.banco} · {t.fecha}
-                        {t.categorias && ` · ${t.categorias.nombre}`}
-                        {t.clasificado_por === 'ia' && (
-                          <span className="text-purple-400 ml-1">· 🤖 IA</span>
-                        )}
-                        {t.clasificado_por === 'regla' && (
-                          <span className="text-blue-400 ml-1">· 📚 Regla</span>
-                        )}
-                      </p>
-                    </div>
+              <div
+                key={t.id}
+                className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 p-3 sm:p-4 ${i !== transaccionesFiltradas.length - 1 ? 'border-b border-gray-800' : ''}`}
+              >
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 rounded-full bg-gray-800 flex items-center justify-center text-lg">
+                    {t.categorias?.icono || (t.tipo === 'gasto' ? '↓' : '↑')}
                   </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-shrink-0">
-                    <div className="text-right">
-                      <p className={`font-semibold text-sm sm:text-base whitespace-nowrap ${t.tipo === 'gasto' ? 'text-red-400' : 'text-green-400'}`}>
-                        {formatMonto(t.monto, t.tipo)}
-                      </p>
-                      {t.necesita_revision && (
-                        <p className="text-yellow-400 text-xs">⚠ Revisar</p>
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{t.descripcion}</p>
+                    <p className="text-gray-400 text-xs sm:text-sm truncate">
+                      {t.cuentas?.banco} · {t.fecha}
+                      {t.categorias && ` · ${t.categorias.nombre}`}
+                      {t.clasificado_por === 'ia' && (
+                        <span className="text-purple-400 ml-1">· 🤖 IA</span>
                       )}
-                    </div>
-                    <button
-                      onClick={() => setEditando(editando === t.id ? null : t.id)}
-                      className="text-gray-600 hover:text-blue-400 transition text-sm px-2 py-1 rounded-lg hover:bg-gray-800"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => eliminar(t.id)}
-                      className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded-lg hover:bg-gray-800"
-                    >
-                      🗑️
-                    </button>
+                      {t.clasificado_por === 'regla' && (
+                        <span className="text-blue-400 ml-1">· 📚 Regla</span>
+                      )}
+                    </p>
                   </div>
                 </div>
-
-                {/* Panel de edición */}
-                {editando === t.id && (
-                  <div className="px-3 sm:px-4 pb-4 bg-gray-850 border-b border-gray-800">
-                    <div className="bg-gray-800 rounded-xl p-4">
-                      <p className="text-gray-400 text-sm mb-2">Corregir categoría:</p>
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <select
-                          defaultValue={t.categoria_id || ''}
-                          onChange={e => {
-                            if (e.target.value === '__nueva__') {
-                              abrirModalCategoria(t)
-                              return
-                            }
-                            if (e.target.value) corregirCategoria(t, e.target.value)
-                          }}
-                          className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        >
-                          <option value="" disabled>Selecciona categoría...</option>
-                          <optgroup label="Personal">
-                            {categorias.filter(c => c.tipo === 'personal').map(c => (
-                              <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="Empresarial">
-                            {categorias.filter(c => c.tipo === 'empresarial').map(c => (
-                              <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
-                            ))}
-                          </optgroup>
-                          {categorias.filter(c => c.tipo !== 'personal' && c.tipo !== 'empresarial').length > 0 && (
-                            <optgroup label="Otros tipos">
-                              {categorias.filter(c => c.tipo !== 'personal' && c.tipo !== 'empresarial').map(c => (
-                                <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          <option value="__nueva__">+ Agregar nueva categoría</option>
-                        </select>
-                        <button
-                          onClick={() => setEditando(null)}
-                          className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-xl transition text-sm"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
+                <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-shrink-0">
+                  <div className="text-right">
+                    <p className={`font-semibold text-sm sm:text-base whitespace-nowrap ${t.tipo === 'gasto' ? 'text-red-400' : 'text-green-400'}`}>
+                      {formatMonto(t.monto, t.tipo)}
+                    </p>
+                    {t.necesita_revision && (
+                      <p className="text-yellow-400 text-xs">⚠ Revisar</p>
+                    )}
                   </div>
-                )}
+                  <button
+                    onClick={() => abrirEditor(t)}
+                    className="text-gray-600 hover:text-blue-400 transition text-sm px-2 py-1 rounded-lg hover:bg-gray-800"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => eliminar(t.id)}
+                    className="text-gray-600 hover:text-red-400 transition text-sm px-2 py-1 rounded-lg hover:bg-gray-800"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))}
           </div>
