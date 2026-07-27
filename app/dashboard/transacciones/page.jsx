@@ -10,7 +10,6 @@ const IA_CLASIFICACION_ACTIVADA = false
 
 const ICONOS_TIPO_DEFAULT = { personal: '👤', empresarial: '🏢' }
 
-// Íconos curados para categorías/tipos de finanzas
 const ICONOS_DISPONIBLES = [
   '🍔', '🍕', '🍜', '🍱', '☕', '🍺', '🍷', '🥗',
   '🚗', '🚕', '🚌', '🚲', '✈️', '⛽', '🚆', '🛵',
@@ -27,6 +26,22 @@ const ICONOS_DISPONIBLES = [
   '⚡', '🔥', '💧', '🗑️', '📡', '🛡️', '⭐', '📌'
 ]
 
+function EstilosGlobales() {
+  return (
+    <style jsx global>{`
+      @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+      .font-display { font-family: 'Chakra Petch', sans-serif; }
+      .font-mono { font-family: 'JetBrains Mono', monospace; }
+      .glow-cian { box-shadow: 0 0 0 1px rgba(0,229,255,0.25), 0 0 24px -4px rgba(0,229,255,0.35); }
+      .glow-magenta { box-shadow: 0 0 0 1px rgba(255,46,154,0.25), 0 0 24px -4px rgba(255,46,154,0.35); }
+      .glow-violeta { box-shadow: 0 0 0 1px rgba(123,97,255,0.25), 0 0 24px -4px rgba(123,97,255,0.35); }
+      ::-webkit-scrollbar { height: 6px; width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #262E4A; border-radius: 999px; }
+    `}</style>
+  )
+}
+
 function SelectorIcono({ valor, onSeleccionar }) {
   const [abierto, setAbierto] = useState(false)
 
@@ -35,24 +50,24 @@ function SelectorIcono({ valor, onSeleccionar }) {
       <button
         type="button"
         onClick={() => setAbierto(!abierto)}
-        className="w-full bg-gray-950 text-white rounded-xl px-4 py-3 outline-none border border-gray-700 focus:border-blue-500 transition text-base flex items-center justify-between"
+        className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base flex items-center justify-between"
       >
         <span className="flex items-center gap-2">
           <span className="text-xl">{valor || '📦'}</span>
-          <span className="text-gray-400 text-sm">Elegir ícono</span>
+          <span className="text-[#8891B0] text-sm">Elegir ícono</span>
         </span>
-        <span className="text-gray-500">{abierto ? '▲' : '▼'}</span>
+        <span className="text-[#5A6288]">{abierto ? '▲' : '▼'}</span>
       </button>
 
       {abierto && (
-        <div className="absolute z-20 mt-2 w-full bg-gray-800 border border-gray-700 rounded-xl p-3 shadow-2xl max-h-48 overflow-y-auto">
+        <div className="absolute z-20 mt-2 w-full bg-[#131829] border border-[#262E4A] rounded-xl p-3 shadow-2xl max-h-48 overflow-y-auto">
           <div className="grid grid-cols-8 gap-1">
             {ICONOS_DISPONIBLES.map((icono, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => { onSeleccionar(icono); setAbierto(false) }}
-                className={`text-xl p-1.5 rounded-lg hover:bg-gray-700 transition ${valor === icono ? 'bg-blue-600/20 ring-1 ring-blue-500' : ''}`}
+                className={`text-xl p-1.5 rounded-lg hover:bg-[#1B2138] transition ${valor === icono ? 'bg-[#7B61FF]/20 ring-1 ring-[#7B61FF]' : ''}`}
               >
                 {icono}
               </button>
@@ -66,14 +81,14 @@ function SelectorIcono({ valor, onSeleccionar }) {
 
 // Modal para crear una categoría o un tipo nuevo, sin salir de la página
 function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
-  const [panel, setPanel] = useState('eleccion') // 'eleccion' | 'categoria' | 'tipo'
+  const [panel, setPanel] = useState('eleccion')
   const [loading, setLoading] = useState(false)
   const [tiposExistentes, setTiposExistentes] = useState(['personal', 'empresarial'])
   const [tiposPersonalizados, setTiposPersonalizados] = useState([])
   const [mensajeExito, setMensajeExito] = useState('')
 
   const [formCategoria, setFormCategoria] = useState({
-    nombre: '', tipo: 'personal', color: '#3b82f6', icono: '📦'
+    nombre: '', tipo: 'personal', color: '#00E5FF', icono: '📦'
   })
   const [formTipo, setFormTipo] = useState({ nombre: '', icono: '🗂️' })
 
@@ -119,9 +134,7 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
       alert('Error al guardar la categoría: ' + error.message)
       return
     }
-    if (data) {
-      onCategoriaCreada(data)
-    }
+    if (data) onCategoriaCreada(data)
   }
 
   const guardarTipo = async () => {
@@ -154,36 +167,36 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 max-w-md w-full border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 font-body">
+      <div className="bg-[#131829] rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#262E4A] shadow-2xl max-h-[90vh] overflow-y-auto glow-violeta">
 
         {panel === 'eleccion' && (
           <>
-            <h2 className="text-lg sm:text-xl font-semibold mb-4">¿Qué quieres agregar?</h2>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-white">¿Qué quieres agregar?</h2>
             {mensajeExito && (
-              <div className="bg-green-900/30 border border-green-700 text-green-400 text-sm rounded-xl px-4 py-2 mb-4">
+              <div className="bg-[#00E5FF]/10 border border-[#00E5FF]/40 text-[#00E5FF] text-sm rounded-xl px-4 py-2 mb-4">
                 {mensajeExito}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 onClick={() => setPanel('categoria')}
-                className="bg-gray-950 border border-gray-700 hover:border-blue-500 rounded-2xl p-5 text-left transition"
+                className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#00E5FF] rounded-2xl p-5 text-left transition group"
               >
                 <p className="text-3xl mb-2">🏷️</p>
-                <p className="font-semibold">Nueva categoría</p>
-                <p className="text-gray-400 text-sm mt-1">Ej: Gimnasio, Mascotas, Netflix</p>
+                <p className="font-semibold font-display text-white group-hover:text-[#00E5FF] transition">Nueva categoría</p>
+                <p className="text-[#8891B0] text-sm mt-1">Ej: Gimnasio, Mascotas, Netflix</p>
               </button>
               <button
                 onClick={() => setPanel('tipo')}
-                className="bg-gray-950 border border-gray-700 hover:border-purple-500 rounded-2xl p-5 text-left transition"
+                className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#7B61FF] rounded-2xl p-5 text-left transition group"
               >
                 <p className="text-3xl mb-2">📂</p>
-                <p className="font-semibold">Nuevo tipo</p>
-                <p className="text-gray-400 text-sm mt-1">Ej: Inversiones, Familiar, Ahorro</p>
+                <p className="font-semibold font-display text-white group-hover:text-[#7B61FF] transition">Nuevo tipo</p>
+                <p className="text-[#8891B0] text-sm mt-1">Ej: Inversiones, Familiar, Ahorro</p>
               </button>
             </div>
-            <button onClick={onCerrar} className="mt-4 text-gray-400 hover:text-white text-sm transition">
+            <button onClick={onCerrar} className="mt-4 text-[#8891B0] hover:text-white text-sm transition">
               Cancelar
             </button>
           </>
@@ -191,23 +204,23 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
 
         {panel === 'categoria' && (
           <>
-            <h2 className="text-lg sm:text-xl font-semibold mb-4">Nueva categoría</h2>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-white">Nueva categoría</h2>
             <div className="space-y-4">
               <div>
-                <label className="text-gray-400 text-sm mb-1 block">Nombre</label>
+                <label className="text-[#8891B0] text-sm mb-1 block">Nombre</label>
                 <input
                   placeholder="Ej: Gimnasio"
                   value={formCategoria.nombre}
                   onChange={e => setFormCategoria({...formCategoria, nombre: e.target.value})}
-                  className="w-full bg-gray-950 text-white rounded-xl px-4 py-3 outline-none border border-gray-700 focus:border-blue-500 transition text-base"
+                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base"
                 />
               </div>
               <div>
-                <label className="text-gray-400 text-sm mb-1 block">Tipo</label>
+                <label className="text-[#8891B0] text-sm mb-1 block">Tipo</label>
                 <select
                   value={formCategoria.tipo}
                   onChange={e => setFormCategoria({...formCategoria, tipo: e.target.value})}
-                  className="w-full bg-gray-950 text-white rounded-xl px-4 py-3 outline-none border border-gray-700 focus:border-blue-500 transition text-base capitalize"
+                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base capitalize"
                 >
                   {tiposExistentes.map(t => (
                     <option key={t} value={t}>{obtenerIconoTipo(t)} {t}</option>
@@ -215,16 +228,16 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
                 </select>
               </div>
               <div>
-                <label className="text-gray-400 text-sm mb-1 block">Ícono</label>
+                <label className="text-[#8891B0] text-sm mb-1 block">Ícono</label>
                 <SelectorIcono valor={formCategoria.icono} onSeleccionar={(icono) => setFormCategoria({...formCategoria, icono})} />
               </div>
               <div>
-                <label className="text-gray-400 text-sm mb-1 block">Color</label>
+                <label className="text-[#8891B0] text-sm mb-1 block">Color</label>
                 <input
                   type="color"
                   value={formCategoria.color}
                   onChange={e => setFormCategoria({...formCategoria, color: e.target.value})}
-                  className="w-full bg-gray-950 rounded-xl px-2 py-2 outline-none h-12 border border-gray-700"
+                  className="w-full bg-[#0B0E1A] rounded-xl px-2 py-2 outline-none h-12 border border-[#262E4A]"
                 />
               </div>
             </div>
@@ -232,11 +245,11 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
               <button
                 onClick={guardarCategoria}
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-6 py-2 rounded-xl transition"
+                className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
               >
                 {loading ? 'Guardando...' : 'Guardar'}
               </button>
-              <button onClick={() => setPanel('eleccion')} className="bg-gray-800 hover:bg-gray-700 px-6 py-2 rounded-xl transition">
+              <button onClick={() => setPanel('eleccion')} className="bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition text-white">
                 ← Volver
               </button>
             </div>
@@ -245,19 +258,19 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
 
         {panel === 'tipo' && (
           <>
-            <h2 className="text-lg sm:text-xl font-semibold mb-4">Nuevo tipo</h2>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-white">Nuevo tipo</h2>
             <div className="space-y-4">
               <div>
-                <label className="text-gray-400 text-sm mb-1 block">Nombre del tipo</label>
+                <label className="text-[#8891B0] text-sm mb-1 block">Nombre del tipo</label>
                 <input
                   placeholder="Ej: Inversiones"
                   value={formTipo.nombre}
                   onChange={e => setFormTipo({...formTipo, nombre: e.target.value})}
-                  className="w-full bg-gray-950 text-white rounded-xl px-4 py-3 outline-none border border-gray-700 focus:border-blue-500 transition text-base"
+                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base"
                 />
               </div>
               <div>
-                <label className="text-gray-400 text-sm mb-1 block">Ícono</label>
+                <label className="text-[#8891B0] text-sm mb-1 block">Ícono</label>
                 <SelectorIcono valor={formTipo.icono} onSeleccionar={(icono) => setFormTipo({...formTipo, icono})} />
               </div>
             </div>
@@ -265,11 +278,11 @@ function ModalNuevaCategoria({ onCerrar, onCategoriaCreada, onTipoCreado }) {
               <button
                 onClick={guardarTipo}
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-6 py-2 rounded-xl transition"
+                className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
               >
                 {loading ? 'Guardando...' : 'Guardar'}
               </button>
-              <button onClick={() => setPanel('eleccion')} className="bg-gray-800 hover:bg-gray-700 px-6 py-2 rounded-xl transition">
+              <button onClick={() => setPanel('eleccion')} className="bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition text-white">
                 ← Volver
               </button>
             </div>
@@ -297,18 +310,12 @@ export default function Transacciones() {
     categoria_id: ''
   })
 
-  // Edición de transacción existente: modal completo con todos los campos,
-  // igual que el formulario de "Nueva transacción"
   const [transaccionEditandoId, setTransaccionEditandoId] = useState(null)
   const [formEditar, setFormEditar] = useState({
     descripcion: '', monto: '', fecha: '', tipo: 'gasto', cuenta_id: '', categoria_id: ''
   })
   const [guardandoEdicion, setGuardandoEdicion] = useState(false)
 
-  // Modal de nueva categoría/tipo: 'origenModalCategoria' guarda de dónde
-  // se abrió, para saber a qué formulario devolverle la categoría creada:
-  // 'form' = formulario de nueva transacción
-  // 'editar' = modal de edición de una transacción existente
   const [mostrarModalCategoria, setMostrarModalCategoria] = useState(false)
   const [origenModalCategoria, setOrigenModalCategoria] = useState(null)
 
@@ -404,8 +411,6 @@ export default function Transacciones() {
     setLoading(false)
   }
 
-  // --- Edición de transacción existente ---
-
   const abrirEditor = (t) => {
     setTransaccionEditandoId(t.id)
     setFormEditar({
@@ -445,8 +450,6 @@ export default function Transacciones() {
       return
     }
 
-    // Si se asignó categoría manualmente, guardamos/actualizamos la regla
-    // para que la próxima vez que aparezca este mismo comercio se clasifique solo.
     if (formEditar.categoria_id) {
       const { data: reglaExistente } = await supabase
         .from('reglas_ia')
@@ -474,8 +477,6 @@ export default function Transacciones() {
     cargarDatos()
   }
 
-  // Se llama cuando el select de categoría (nueva transacción o edición)
-  // recibe la opción "+ Agregar nueva categoría"
   const abrirModalCategoria = (origen) => {
     setOrigenModalCategoria(origen)
     setMostrarModalCategoria(true)
@@ -524,6 +525,7 @@ export default function Transacciones() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6 lg:p-8">
+      <EstilosGlobales />
       <div className="max-w-4xl mx-auto">
 
         {mostrarModalCategoria && (
@@ -534,56 +536,57 @@ export default function Transacciones() {
           />
         )}
 
-        {/* Modal de edición completa de transacción */}
-        {transaccionEditandoId && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-40 p-4">
-            <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 max-w-md w-full border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-lg sm:text-xl font-semibold mb-4">Editar transacción</h2>
-
+        {/* Modal: Nueva transacción (estilo neon) */}
+        {mostrarForm && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-40 p-4 font-body">
+            <div className="bg-[#131829] rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#262E4A] shadow-2xl max-h-[90vh] overflow-y-auto glow-cian">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-white">Nueva transacción</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Descripción</label>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Descripción</label>
                   <input
-                    value={formEditar.descripcion}
-                    onChange={e => setFormEditar({...formEditar, descripcion: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                    placeholder="Ej: Almuerzo Jumbo"
+                    value={form.descripcion}
+                    onChange={e => setForm({...form, descripcion: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#00E5FF] transition text-base"
                   />
                 </div>
                 <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Monto (CLP)</label>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Monto (CLP)</label>
                   <input
                     type="number"
-                    value={formEditar.monto}
-                    onChange={e => setFormEditar({...formEditar, monto: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                    placeholder="Ej: 15000"
+                    value={form.monto}
+                    onChange={e => setForm({...form, monto: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#00E5FF] transition text-base font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Fecha</label>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Fecha</label>
                   <input
                     type="date"
-                    value={formEditar.fecha}
-                    onChange={e => setFormEditar({...formEditar, fecha: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                    value={form.fecha}
+                    onChange={e => setForm({...form, fecha: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#00E5FF] transition text-base"
                   />
                 </div>
                 <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Tipo</label>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Tipo</label>
                   <select
-                    value={formEditar.tipo}
-                    onChange={e => setFormEditar({...formEditar, tipo: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                    value={form.tipo}
+                    onChange={e => setForm({...form, tipo: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#00E5FF] transition text-base"
                   >
                     <option value="gasto">Gasto</option>
                     <option value="ingreso">Ingreso</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Cuenta</label>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Cuenta</label>
                   <select
-                    value={formEditar.cuenta_id}
-                    onChange={e => setFormEditar({...formEditar, cuenta_id: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                    value={form.cuenta_id}
+                    onChange={e => setForm({...form, cuenta_id: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#00E5FF] transition text-base"
                   >
                     <option value="">Selecciona una cuenta</option>
                     {cuentas.map(c => (
@@ -592,7 +595,121 @@ export default function Transacciones() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Categoría</label>
+                  <label className="text-[#8891B0] text-sm mb-1 block">
+                    Categoría <span className="text-[#5A6288]">(opcional{IA_CLASIFICACION_ACTIVADA ? ' — la IA la detecta sola' : ''})</span>
+                  </label>
+                  <select
+                    value={form.categoria_id}
+                    onChange={e => {
+                      if (e.target.value === '__nueva__') {
+                        abrirModalCategoria('form')
+                        return
+                      }
+                      setForm({...form, categoria_id: e.target.value})
+                    }}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#00E5FF] transition text-base"
+                  >
+                    <option value="">{IA_CLASIFICACION_ACTIVADA ? 'Sin categoría — clasificar con IA' : 'Sin categoría — marcar para revisar'}</option>
+                    <optgroup label="Personal">
+                      {categoriasPersonales.map(c => (
+                        <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Empresarial">
+                      {categoriasEmpresariales.map(c => (
+                        <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                      ))}
+                    </optgroup>
+                    {categoriasOtrosTipos.length > 0 && (
+                      <optgroup label="Otros tipos">
+                        {categoriasOtrosTipos.map(c => (
+                          <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="__nueva__">+ Agregar nueva categoría</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setMostrarForm(false)}
+                  className="flex-1 bg-[#1B2138] hover:bg-[#232A47] text-white font-bold py-3 rounded-xl transition border border-[#262E4A]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={agregarTransaccion}
+                  disabled={loading}
+                  className="flex-1 bg-[#00E5FF] hover:bg-[#33ebff] disabled:opacity-50 text-[#0B0E1A] font-bold py-3 rounded-xl transition glow-cian"
+                >
+                  {loading ? (IA_CLASIFICACION_ACTIVADA ? '🤖 Clasificando...' : 'Guardando...') : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Editar transacción (estilo neon) */}
+        {transaccionEditandoId && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-40 p-4 font-body">
+            <div className="bg-[#131829] rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#262E4A] shadow-2xl max-h-[90vh] overflow-y-auto glow-violeta">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-white">Editar transacción</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Descripción</label>
+                  <input
+                    value={formEditar.descripcion}
+                    onChange={e => setFormEditar({...formEditar, descripcion: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base"
+                  />
+                </div>
+                <div>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Monto (CLP)</label>
+                  <input
+                    type="number"
+                    value={formEditar.monto}
+                    onChange={e => setFormEditar({...formEditar, monto: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Fecha</label>
+                  <input
+                    type="date"
+                    value={formEditar.fecha}
+                    onChange={e => setFormEditar({...formEditar, fecha: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base"
+                  />
+                </div>
+                <div>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Tipo</label>
+                  <select
+                    value={formEditar.tipo}
+                    onChange={e => setFormEditar({...formEditar, tipo: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base"
+                  >
+                    <option value="gasto">Gasto</option>
+                    <option value="ingreso">Ingreso</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Cuenta</label>
+                  <select
+                    value={formEditar.cuenta_id}
+                    onChange={e => setFormEditar({...formEditar, cuenta_id: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base"
+                  >
+                    <option value="">Selecciona una cuenta</option>
+                    {cuentas.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre} — {c.banco}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Categoría</label>
                   <select
                     value={formEditar.categoria_id}
                     onChange={e => {
@@ -602,7 +719,7 @@ export default function Transacciones() {
                       }
                       setFormEditar({...formEditar, categoria_id: e.target.value})
                     }}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] transition text-base"
                   >
                     <option value="">Sin categoría</option>
                     <optgroup label="Personal">
@@ -630,14 +747,14 @@ export default function Transacciones() {
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={cerrarEditor}
-                  className="flex-1 bg-gray-800 hover:bg-gray-700 font-bold py-3 rounded-xl transition"
+                  className="flex-1 bg-[#1B2138] hover:bg-[#232A47] text-white font-bold py-3 rounded-xl transition border border-[#262E4A]"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={guardarEdicion}
                   disabled={guardandoEdicion}
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 font-bold py-3 rounded-xl transition"
+                  className="flex-1 bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 text-white font-bold py-3 rounded-xl transition glow-violeta"
                 >
                   {guardandoEdicion ? 'Guardando...' : 'Guardar cambios'}
                 </button>
@@ -685,121 +802,6 @@ export default function Transacciones() {
                 {banco}
               </button>
             ))}
-          </div>
-        )}
-
-        {/* Modal: Nueva transacción */}
-        {mostrarForm && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-40 p-4">
-            <div className="bg-gray-900 rounded-2xl p-4 sm:p-6 max-w-md w-full border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-lg sm:text-xl font-semibold mb-4">Nueva transacción</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Descripción</label>
-                  <input
-                    placeholder="Ej: Almuerzo Jumbo"
-                    value={form.descripcion}
-                    onChange={e => setForm({...form, descripcion: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                  />
-                </div>
-                <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Monto (CLP)</label>
-                  <input
-                    type="number"
-                    placeholder="Ej: 15000"
-                    value={form.monto}
-                    onChange={e => setForm({...form, monto: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                  />
-                </div>
-                <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Fecha</label>
-                  <input
-                    type="date"
-                    value={form.fecha}
-                    onChange={e => setForm({...form, fecha: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                  />
-                </div>
-                <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Tipo</label>
-                  <select
-                    value={form.tipo}
-                    onChange={e => setForm({...form, tipo: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                  >
-                    <option value="gasto">Gasto</option>
-                    <option value="ingreso">Ingreso</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Cuenta</label>
-                  <select
-                    value={form.cuenta_id}
-                    onChange={e => setForm({...form, cuenta_id: e.target.value})}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                  >
-                    <option value="">Selecciona una cuenta</option>
-                    {cuentas.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre} — {c.banco}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-gray-400 text-sm mb-1 block">
-                    Categoría <span className="text-gray-600">(opcional{IA_CLASIFICACION_ACTIVADA ? ' — la IA la detecta sola' : ''})</span>
-                  </label>
-                  <select
-                    value={form.categoria_id}
-                    onChange={e => {
-                      if (e.target.value === '__nueva__') {
-                        abrirModalCategoria('form')
-                        return
-                      }
-                      setForm({...form, categoria_id: e.target.value})
-                    }}
-                    className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                  >
-                    <option value="">{IA_CLASIFICACION_ACTIVADA ? 'Sin categoría — clasificar con IA' : 'Sin categoría — marcar para revisar'}</option>
-                    <optgroup label="Personal">
-                      {categoriasPersonales.map(c => (
-                        <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Empresarial">
-                      {categoriasEmpresariales.map(c => (
-                        <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
-                      ))}
-                    </optgroup>
-                    {categoriasOtrosTipos.length > 0 && (
-                      <optgroup label="Otros tipos">
-                        {categoriasOtrosTipos.map(c => (
-                          <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
-                        ))}
-                      </optgroup>
-                    )}
-                    <option value="__nueva__">+ Agregar nueva categoría</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setMostrarForm(false)}
-                  className="flex-1 bg-gray-800 hover:bg-gray-700 font-bold py-3 rounded-xl transition"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={agregarTransaccion}
-                  disabled={loading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 font-bold py-3 rounded-xl transition"
-                >
-                  {loading ? (IA_CLASIFICACION_ACTIVADA ? '🤖 Clasificando...' : 'Guardando...') : 'Guardar'}
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
