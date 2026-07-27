@@ -21,7 +21,7 @@ const CATEGORIAS_DEFAULT = [
   { nombre: 'Otros Empresarial', tipo: 'empresarial', color: '#5A6288', icono: '📦' },
 ]
 
-const ICONOS_TIPO = {
+const ICONOS_TIPO_DEFAULT = {
   personal: '👤',
   empresarial: '🏢'
 }
@@ -45,33 +45,38 @@ function EstilosGlobales() {
 
 export default function Categorias() {
   const [categorias, setCategorias] = useState([])
-  const [mostrarForm, setMostrarForm] = useState(false)
+  const [tiposPersonalizados, setTiposPersonalizados] = useState([])
   const [loading, setLoading] = useState(false)
   const [cargandoDefaults, setCargandoDefaults] = useState(false)
-  const [creandoTipoNuevo, setCreandoTipoNuevo] = useState(false)
-  const [nuevoTipoTexto, setNuevoTipoTexto] = useState('')
-  const [form, setForm] = useState({
-    nombre: '',
-    tipo: 'personal',
-    color: '#00E5FF',
-    icono: '📦'
+
+  // 'eleccion' | 'categoria' | 'tipo' | null (null = cerrado)
+  const [panelActivo, setPanelActivo] = useState(null)
+
+  const [formCategoria, setFormCategoria] = useState({
+    nombre: '', tipo: 'personal', color: '#00E5FF', icono: '📦'
   })
+  const [formTipo, setFormTipo] = useState({ nombre: '', icono: '🗂️' })
 
   useEffect(() => {
-    cargarCategorias()
+    cargarTodo()
   }, [])
 
-  const cargarCategorias = async () => {
+  const cargarTodo = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return window.location.href = '/auth'
 
-    const { data } = await supabase
+    const { data: cats } = await supabase
       .from('categorias')
       .select('*')
       .order('tipo', { ascending: true })
       .order('nombre', { ascending: true })
+    setCategorias(cats || [])
 
-    setCategorias(data || [])
+    const { data: tipos } = await supabase
+      .from('tipos_categoria')
+      .select('*')
+      .order('created_at', { ascending: true })
+    setTiposPersonalizados(tipos || [])
   }
 
   const cargarDefaults = async () => {
@@ -80,69 +85,98 @@ export default function Categorias() {
 
     const inserts = CATEGORIAS_DEFAULT.map(c => ({ ...c, user_id: user.id }))
     await supabase.from('categorias').insert(inserts)
-    cargarCategorias()
+    cargarTodo()
     setCargandoDefaults(false)
   }
 
-  // Tipos existentes (sacados de tus categorías), siempre incluyendo
-  // personal/empresarial como base aunque aún no tengas categorías creadas.
-  const tiposExistentes = [...new Set(['personal', 'empresarial', ...categorias.map(c => c.tipo)])]
+  // Lista combinada de tipos: los fijos (personal/empresarial) + los que el
+  // usuario haya creado en tipos_categoria + cualquiera que aparezca en
+  // categorías existentes (por seguridad, en caso de datos antiguos)
+  const tiposExistentes = [...new Set([
+    'personal',
+    'empresarial',
+    ...tiposPersonalizados.map(t => t.nombre),
+    ...categorias.map(c => c.tipo)
+  ])]
 
-  const abrirFormularioNueva = () => {
-    setForm({ nombre: '', tipo: tiposExistentes[0] || 'personal', color: '#00E5FF', icono: '📦' })
-    setCreandoTipoNuevo(false)
-    setNuevoTipoTexto('')
-    setMostrarForm(true)
+  const obtenerIconoTipo = (tipo) => {
+    if (ICONOS_TIPO_DEFAULT[tipo]) return ICONOS_TIPO_DEFAULT[tipo]
+    const encontrado = tiposPersonalizados.find(t => t.nombre === tipo)
+    return encontrado?.icono || '🗂️'
   }
 
-  const manejarCambioTipo = (valor) => {
-    if (valor === '__nuevo__') {
-      setCreandoTipoNuevo(true)
-      return
-    }
-    setCreandoTipoNuevo(false)
-    setForm({ ...form, tipo: valor })
+  const abrirEleccion = () => setPanelActivo('eleccion')
+
+  const abrirFormCategoria = () => {
+    setFormCategoria({ nombre: '', tipo: tiposExistentes[0] || 'personal', color: '#00E5FF', icono: '📦' })
+    setPanelActivo('categoria')
   }
 
-  const confirmarNuevoTipo = () => {
-    const tipoLimpio = nuevoTipoTexto.trim().toLowerCase()
-    if (!tipoLimpio) return
-    setForm({ ...form, tipo: tipoLimpio })
-    setCreandoTipoNuevo(false)
-    setNuevoTipoTexto('')
+  const abrirFormTipo = () => {
+    setFormTipo({ nombre: '', icono: '🗂️' })
+    setPanelActivo('tipo')
   }
 
-  const agregarCategoria = async () => {
-    if (!form.nombre) return
+  const guardarCategoria = async () => {
+    if (!formCategoria.nombre) return
     setLoading(true)
-
     const { data: { user } } = await supabase.auth.getUser()
 
     await supabase.from('categorias').insert({
-      nombre: form.nombre,
-      tipo: form.tipo,
-      color: form.color,
-      icono: form.icono,
+      nombre: formCategoria.nombre,
+      tipo: formCategoria.tipo,
+      color: formCategoria.color,
+      icono: formCategoria.icono,
       user_id: user.id
     })
-    setForm({ nombre: '', tipo: tiposExistentes[0] || 'personal', color: '#00E5FF', icono: '📦' })
-    setMostrarForm(false)
-    cargarCategorias()
+
+    setPanelActivo(null)
+    cargarTodo()
+    setLoading(false)
+  }
+
+  const guardarTipo = async () => {
+    const nombreLimpio = formTipo.nombre.trim().toLowerCase()
+    if (!nombreLimpio) return
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { error } = await supabase.from('tipos_categoria').insert({
+      user_id: user.id,
+      nombre: nombreLimpio,
+      icono: formTipo.icono || '🗂️'
+    })
+
+    if (error) {
+      alert(error.code === '23505' ? 'Ya existe un tipo con ese nombre' : 'Error al guardar')
+      setLoading(false)
+      return
+    }
+
+    setPanelActivo(null)
+    cargarTodo()
     setLoading(false)
   }
 
   const eliminarCategoria = async (cat) => {
     if (!confirm(`¿Eliminar "${cat.nombre}"?`)) return
     await supabase.from('categorias').delete().eq('id', cat.id)
-    cargarCategorias()
+    cargarTodo()
   }
 
-  // Agrupar categorías por tipo, dinámicamente (no solo personal/empresarial)
+  const eliminarTipo = async (tipo) => {
+    const tieneCategorias = categorias.some(c => c.tipo === tipo.nombre)
+    if (tieneCategorias) {
+      alert('Este tipo tiene categorías dentro. Elimina o mueve esas categorías primero.')
+      return
+    }
+    if (!confirm(`¿Eliminar el tipo "${tipo.nombre}"?`)) return
+    await supabase.from('tipos_categoria').delete().eq('id', tipo.id)
+    cargarTodo()
+  }
+
   const categoriasPorTipo = tiposExistentes
-    .map(tipo => ({
-      tipo,
-      items: categorias.filter(c => c.tipo === tipo)
-    }))
+    .map(tipo => ({ tipo, items: categorias.filter(c => c.tipo === tipo) }))
     .filter(grupo => grupo.items.length > 0)
 
   return (
@@ -172,7 +206,7 @@ export default function Categorias() {
               </button>
             )}
             <button
-              onClick={abrirFormularioNueva}
+              onClick={abrirEleccion}
               className="bg-[#7B61FF] hover:bg-[#8f79ff] px-4 py-2 rounded-xl transition glow-violeta text-sm sm:text-base"
             >
               + Nueva
@@ -180,8 +214,39 @@ export default function Categorias() {
           </div>
         </div>
 
-        {/* Formulario */}
-        {mostrarForm && (
+        {/* Panel de elección: ¿categoría o tipo? */}
+        {panelActivo === 'eleccion' && (
+          <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-4 sm:p-6 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">¿Qué quieres agregar?</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={abrirFormCategoria}
+                className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#00E5FF] rounded-2xl p-5 text-left transition group"
+              >
+                <p className="text-3xl mb-2">🏷️</p>
+                <p className="font-semibold font-display group-hover:text-[#00E5FF] transition">Nueva categoría</p>
+                <p className="text-[#8891B0] text-sm mt-1">Ej: Gimnasio, Mascotas, Netflix</p>
+              </button>
+              <button
+                onClick={abrirFormTipo}
+                className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#7B61FF] rounded-2xl p-5 text-left transition group"
+              >
+                <p className="text-3xl mb-2">📂</p>
+                <p className="font-semibold font-display group-hover:text-[#7B61FF] transition">Nuevo tipo</p>
+                <p className="text-[#8891B0] text-sm mt-1">Ej: Inversiones, Familiar, Ahorro</p>
+              </button>
+            </div>
+            <button
+              onClick={() => setPanelActivo(null)}
+              className="mt-4 text-[#8891B0] hover:text-white text-sm transition"
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
+
+        {/* Formulario: Nueva categoría */}
+        {panelActivo === 'categoria' && (
           <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-4 sm:p-6 mb-6">
             <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">Nueva categoría</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -189,51 +254,30 @@ export default function Categorias() {
                 <label className="text-[#8891B0] text-sm mb-1 block">Nombre</label>
                 <input
                   placeholder="Ej: Gimnasio"
-                  value={form.nombre}
-                  onChange={e => setForm({...form, nombre: e.target.value})}
+                  value={formCategoria.nombre}
+                  onChange={e => setFormCategoria({...formCategoria, nombre: e.target.value})}
                   className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
                 />
               </div>
-
               <div>
                 <label className="text-[#8891B0] text-sm mb-1 block">Tipo</label>
-                {creandoTipoNuevo ? (
-                  <div className="flex gap-2">
-                    <input
-                      autoFocus
-                      placeholder="Ej: Inversiones"
-                      value={nuevoTipoTexto}
-                      onChange={e => setNuevoTipoTexto(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirmarNuevoTipo() } }}
-                      className="flex-1 bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
-                    />
-                    <button
-                      onClick={confirmarNuevoTipo}
-                      className="bg-[#7B61FF] hover:bg-[#8f79ff] px-4 rounded-xl transition text-sm flex-shrink-0"
-                    >
-                      OK
-                    </button>
-                  </div>
-                ) : (
-                  <select
-                    value={form.tipo}
-                    onChange={e => manejarCambioTipo(e.target.value)}
-                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base capitalize"
-                  >
-                    {tiposExistentes.map(t => (
-                      <option key={t} value={t} className="capitalize">{t}</option>
-                    ))}
-                    <option value="__nuevo__">+ Crear nuevo tipo...</option>
-                  </select>
-                )}
+                <select
+                  value={formCategoria.tipo}
+                  onChange={e => setFormCategoria({...formCategoria, tipo: e.target.value})}
+                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base capitalize"
+                >
+                  {tiposExistentes.map(t => (
+                    <option key={t} value={t} className="capitalize">{obtenerIconoTipo(t)} {t}</option>
+                  ))}
+                </select>
+                <p className="text-[#5A6288] text-xs mt-1">¿No está el tipo que buscas? Créalo primero con "+ Nueva → Nuevo tipo"</p>
               </div>
-
               <div>
                 <label className="text-[#8891B0] text-sm mb-1 block">Ícono (emoji)</label>
                 <input
                   placeholder="Ej: 🏋️"
-                  value={form.icono}
-                  onChange={e => setForm({...form, icono: e.target.value})}
+                  value={formCategoria.icono}
+                  onChange={e => setFormCategoria({...formCategoria, icono: e.target.value})}
                   className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
                 />
               </div>
@@ -241,22 +285,22 @@ export default function Categorias() {
                 <label className="text-[#8891B0] text-sm mb-1 block">Color</label>
                 <input
                   type="color"
-                  value={form.color}
-                  onChange={e => setForm({...form, color: e.target.value})}
+                  value={formCategoria.color}
+                  onChange={e => setFormCategoria({...formCategoria, color: e.target.value})}
                   className="w-full bg-[#0B0E1A] rounded-xl px-2 py-2 outline-none h-12 border border-[#262E4A]"
                 />
               </div>
             </div>
             <div className="flex gap-3 mt-4">
               <button
-                onClick={agregarCategoria}
+                onClick={guardarCategoria}
                 disabled={loading}
                 className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
               >
                 {loading ? 'Guardando...' : 'Guardar'}
               </button>
               <button
-                onClick={() => setMostrarForm(false)}
+                onClick={() => setPanelActivo(null)}
                 className="bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition"
               >
                 Cancelar
@@ -265,11 +309,69 @@ export default function Categorias() {
           </div>
         )}
 
-        {/* Categorías agrupadas por tipo (dinámico) */}
+        {/* Formulario: Nuevo tipo */}
+        {panelActivo === 'tipo' && (
+          <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-4 sm:p-6 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">Nuevo tipo</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[#8891B0] text-sm mb-1 block">Nombre del tipo</label>
+                <input
+                  placeholder="Ej: Inversiones"
+                  value={formTipo.nombre}
+                  onChange={e => setFormTipo({...formTipo, nombre: e.target.value})}
+                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
+                />
+              </div>
+              <div>
+                <label className="text-[#8891B0] text-sm mb-1 block">Ícono (emoji)</label>
+                <input
+                  placeholder="Ej: 📈"
+                  value={formTipo.icono}
+                  onChange={e => setFormTipo({...formTipo, icono: e.target.value})}
+                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={guardarTipo}
+                disabled={loading}
+                className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
+              >
+                {loading ? 'Guardando...' : 'Guardar'}
+              </button>
+              <button
+                onClick={() => setPanelActivo(null)}
+                className="bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tipos sin categorías todavía (creados pero vacíos) */}
+        {tiposPersonalizados.filter(t => !categorias.some(c => c.tipo === t.nombre)).length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display text-[#8891B0]">Tipos sin categorías aún</h2>
+            <div className="flex flex-wrap gap-2">
+              {tiposPersonalizados.filter(t => !categorias.some(c => c.tipo === t.nombre)).map(t => (
+                <div key={t.id} className="flex items-center gap-2 bg-[#131829] border border-[#262E4A] rounded-xl px-3 py-2">
+                  <span>{t.icono}</span>
+                  <span className="capitalize text-sm">{t.nombre}</span>
+                  <button onClick={() => eliminarTipo(t)} className="text-[#5A6288] hover:text-[#FF2E9A] transition">×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Categorías agrupadas por tipo */}
         {categoriasPorTipo.map(grupo => (
           <div key={grupo.tipo} className="mb-8">
             <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display capitalize">
-              {ICONOS_TIPO[grupo.tipo] || '🗂️'} {grupo.tipo}
+              {obtenerIconoTipo(grupo.tipo)} {grupo.tipo}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {grupo.items.map(cat => (
@@ -299,7 +401,7 @@ export default function Categorias() {
           </div>
         ))}
 
-        {categorias.length === 0 && (
+        {categorias.length === 0 && tiposPersonalizados.length === 0 && (
           <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-8 sm:p-12 text-center">
             <p className="text-4xl mb-4">🏷️</p>
             <p className="text-[#8891B0] mb-4">No tienes categorías aún</p>
