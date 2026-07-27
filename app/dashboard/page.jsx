@@ -621,6 +621,7 @@ export default function Dashboard() {
   const [transaccionEditando, setTransaccionEditando] = useState(null)
   const [mostrarModalCategoria, setMostrarModalCategoria] = useState(false)
   const [categoriaRecienCreada, setCategoriaRecienCreada] = useState(null)
+  const [tiposPersonalizadosDashboard, setTiposPersonalizadosDashboard] = useState([])
 
   const mesActual = new Date().getMonth() + 1
   const añoActual = new Date().getFullYear()
@@ -652,6 +653,11 @@ export default function Dashboard() {
       p_año: añoActual
     })
     setGastosPorCategoria(gastosCat || [])
+
+    const { data: tiposPersonalizadosData } = await supabase
+      .from('tipos_categoria')
+      .select('*')
+    setTiposPersonalizadosDashboard(tiposPersonalizadosData || [])
 
     const { data: presupuestos } = await supabase
       .from('presupuestos')
@@ -746,6 +752,11 @@ export default function Dashboard() {
     return categorias.find(c => c.id === categoriaId)
   }
 
+  const obtenerIconoTipoDashboard = (tipo) => {
+    if (ICONOS_TIPO_DEFAULT[tipo]) return ICONOS_TIPO_DEFAULT[tipo]
+    return tiposPersonalizadosDashboard.find(t => t.nombre === tipo)?.icono || '🗂️'
+  }
+
   const irA = (path) => {
     window.location.href = path
   }
@@ -790,6 +801,7 @@ export default function Dashboard() {
 
   const navItems = [
     { path: '/dashboard', icon: '📊', title: 'Dashboard' },
+    { path: '/dashboard/categorias', icon: '📊', title: 'Dashboard' },
     { path: '/dashboard/cuentas', icon: '💳', title: 'Cuentas' },
     { path: '/dashboard/transacciones', icon: '💸', title: 'Transacciones' },
     { path: '/dashboard/reportes', icon: '📈', title: 'Reportes' },
@@ -1104,7 +1116,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Gastos por categoría */}
+            {/* Gastos por categoría, agrupados por tipo */}
             {gastosPorCategoria.filter(g => g.total_gastado > 0).length > 0 && (
               <div className="bg-[#131829] rounded-3xl p-4 sm:p-6 lg:p-8 border border-[#262E4A]">
                 <div className="flex justify-between items-center mb-6">
@@ -1112,38 +1124,57 @@ export default function Dashboard() {
                   <span className="text-[#5A6288] text-xs font-mono uppercase tracking-wide">Este mes</span>
                 </div>
 
-                <div className="space-y-3">
-                  {[...gastosPorCategoria]
-                    .filter(g => g.total_gastado > 0)
-                    .sort((a, b) => b.total_gastado - a.total_gastado)
-                    .map((g, i) => {
-                      const maxGasto = Math.max(...gastosPorCategoria.map(x => x.total_gastado || 0))
-                      const porcentajeBarra = maxGasto > 0 ? (g.total_gastado / maxGasto) * 100 : 0
-                      return (
-                        <div key={i} className="flex items-center gap-3">
-                          <div className="w-9 h-9 flex-shrink-0 rounded-lg bg-[#0B0E1A] border border-[#262E4A] flex items-center justify-center text-base">
-                            {g.icono || '💳'}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex justify-between items-center gap-2 mb-1">
-                              <p className="text-sm truncate">{g.nombre}</p>
-                              <p className="text-sm font-mono text-[#00E5FF] whitespace-nowrap flex-shrink-0">{formatMonto(g.total_gastado)}</p>
-                            </div>
-                            <div className="w-full bg-[#0B0E1A] rounded-full h-1.5 overflow-hidden">
-                              <div
-                                className="h-1.5 rounded-full bg-gradient-to-r from-[#7B61FF] to-[#00E5FF]"
-                                style={{ width: `${porcentajeBarra}%` }}
-                              />
-                            </div>
-                          </div>
+                {[...new Set(gastosPorCategoria.map(g => g.tipo))]
+                  .map(tipo => {
+                    const itemsDelTipo = gastosPorCategoria
+                      .filter(g => g.tipo === tipo && g.total_gastado > 0)
+                      .sort((a, b) => b.total_gastado - a.total_gastado)
+
+                    if (itemsDelTipo.length === 0) return null
+
+                    const subtotalTipo = itemsDelTipo.reduce((acc, g) => acc + g.total_gastado, 0)
+                    const maxGastoTipo = Math.max(...itemsDelTipo.map(g => g.total_gastado))
+
+                    return (
+                      <div key={tipo} className="mb-6 last:mb-0">
+                        <div className="flex justify-between items-center mb-3">
+                          <h3 className="text-sm font-semibold font-display capitalize text-[#8891B0]">
+                            {obtenerIconoTipoDashboard(tipo)} {tipo}
+                          </h3>
+                          <span className="text-xs font-mono text-[#7B61FF]">{formatMonto(subtotalTipo)}</span>
                         </div>
-                      )
-                    })}
-                </div>
+
+                        <div className="space-y-3">
+                          {itemsDelTipo.map((g, i) => {
+                            const porcentajeBarra = maxGastoTipo > 0 ? (g.total_gastado / maxGastoTipo) * 100 : 0
+                            return (
+                              <div key={i} className="flex items-center gap-3">
+                                <div className="w-9 h-9 flex-shrink-0 rounded-lg bg-[#0B0E1A] border border-[#262E4A] flex items-center justify-center text-base">
+                                  {g.icono || '💳'}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex justify-between items-center gap-2 mb-1">
+                                    <p className="text-sm truncate">{g.nombre}</p>
+                                    <p className="text-sm font-mono text-[#00E5FF] whitespace-nowrap flex-shrink-0">{formatMonto(g.total_gastado)}</p>
+                                  </div>
+                                  <div className="w-full bg-[#0B0E1A] rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                      className="h-1.5 rounded-full bg-gradient-to-r from-[#7B61FF] to-[#00E5FF]"
+                                      style={{ width: `${porcentajeBarra}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
 
                 <button
                   onClick={() => irA('/dashboard/reportes')}
-                  className="w-full mt-6 bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] py-2 rounded-lg text-sm transition text-[#8891B0] hover:text-white"
+                  className="w-full mt-2 bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] py-2 rounded-lg text-sm transition text-[#8891B0] hover:text-white"
                 >
                   Ver reporte completo →
                 </button>
