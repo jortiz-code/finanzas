@@ -803,6 +803,7 @@ export default function Dashboard() {
     { path: '/dashboard', icon: '📊', title: 'Dashboard' },
     { path: '/dashboard/cuentas', icon: '💳', title: 'Cuentas' },
     { path: '/dashboard/transacciones', icon: '💸', title: 'Transacciones' },
+    { path: '/dashboard/categorias', icon: '🏷️', title: 'Categorías' },
     { path: '/dashboard/reportes', icon: '📈', title: 'Reportes' },
     { path: '/dashboard/presupuestos', icon: '🎯', title: 'Presupuestos' },
     { path: '/dashboard/alertas', icon: '⚠️', title: 'Alertas' },
