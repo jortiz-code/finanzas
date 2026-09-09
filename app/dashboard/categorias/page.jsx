@@ -433,7 +433,7 @@ export default function Categorias() {
           )
         })}
 
-        {tiposExistentes.length === 0 && (
+        {tiposExistentes.length === 0 && !panelActivo && (
           <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-8 sm:p-12 text-center">
             <p className="text-4xl mb-4">🏷️</p>
             <p className="text-[#8891B0] mb-4">No tienes ningún tipo ni categoría todavía</p>
