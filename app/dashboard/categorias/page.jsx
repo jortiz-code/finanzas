@@ -1,3 +1,4 @@
+
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -83,6 +84,7 @@ export default function Categorias() {
   const [loading, setLoading] = useState(false)
 
   const [panelActivo, setPanelActivo] = useState(null) // 'eleccion' | 'categoria' | 'tipo' | null
+  const [categoriaEditandoId, setCategoriaEditandoId] = useState(null)
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: '', color: '#00E5FF', icono: '📦'
@@ -131,12 +133,20 @@ export default function Categorias() {
   const abrirEleccion = () => setPanelActivo('eleccion')
 
   const abrirFormCategoria = () => {
+    setCategoriaEditandoId(null)
     setFormCategoria({ nombre: '', tipo: tiposExistentes[0] || '', color: '#00E5FF', icono: '📦' })
     setPanelActivo('categoria')
   }
 
   const abrirFormCategoriaConTipo = (tipo) => {
+    setCategoriaEditandoId(null)
     setFormCategoria({ nombre: '', tipo, color: '#00E5FF', icono: '📦' })
+    setPanelActivo('categoria')
+  }
+
+  const abrirEditarCategoria = (cat) => {
+    setCategoriaEditandoId(cat.id)
+    setFormCategoria({ nombre: cat.nombre, tipo: cat.tipo, color: cat.color || '#00E5FF', icono: cat.icono || '📦' })
     setPanelActivo('categoria')
   }
 
@@ -150,14 +160,24 @@ export default function Categorias() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    await supabase.from('categorias').insert({
-      nombre: formCategoria.nombre,
-      tipo: formCategoria.tipo,
-      color: formCategoria.color,
-      icono: formCategoria.icono,
-      user_id: user.id
-    })
+    if (categoriaEditandoId) {
+      await supabase.from('categorias').update({
+        nombre: formCategoria.nombre,
+        tipo: formCategoria.tipo,
+        color: formCategoria.color,
+        icono: formCategoria.icono
+      }).eq('id', categoriaEditandoId)
+    } else {
+      await supabase.from('categorias').insert({
+        nombre: formCategoria.nombre,
+        tipo: formCategoria.tipo,
+        color: formCategoria.color,
+        icono: formCategoria.icono,
+        user_id: user.id
+      })
+    }
 
+    setCategoriaEditandoId(null)
     setPanelActivo(null)
     cargarTodo()
     setLoading(false)
@@ -266,7 +286,7 @@ export default function Categorias() {
         {/* Formulario: Nueva categoría */}
         {panelActivo === 'categoria' && (
           <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-4 sm:p-6 mb-6">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">Nueva categoría</h2>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">{categoriaEditandoId ? 'Editar categoría' : 'Nueva categoría'}</h2>
             {tiposExistentes.length === 0 ? (
               <div className="bg-[#0B0E1A] border border-dashed border-[#262E4A] rounded-xl p-4 text-center">
                 <p className="text-[#8891B0] text-sm">Primero necesitas crear un tipo.</p>
@@ -316,13 +336,13 @@ export default function Categorias() {
                     disabled={loading}
                     className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
                   >
-                    {loading ? 'Guardando...' : 'Guardar'}
+                    {loading ? 'Guardando...' : categoriaEditandoId ? 'Guardar cambios' : 'Guardar'}
                   </button>
                 </div>
               </>
             )}
             <button
-              onClick={() => setPanelActivo(null)}
+              onClick={() => { setPanelActivo(null); setCategoriaEditandoId(null) }}
               className="mt-4 bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition"
             >
               Cancelar
@@ -419,12 +439,21 @@ export default function Categorias() {
                           />
                         </div>
                       </div>
-                      <button
-                        onClick={() => eliminarCategoria(cat)}
-                        className="text-[#5A6288] hover:text-[#FF2E9A] transition flex-shrink-0"
-                      >
-                        ×
-                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => abrirEditarCategoria(cat)}
+                          className="text-[#5A6288] hover:text-[#00E5FF] transition text-sm px-1"
+                          title="Editar categoría"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => eliminarCategoria(cat)}
+                          className="text-[#5A6288] hover:text-[#FF2E9A] transition"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
