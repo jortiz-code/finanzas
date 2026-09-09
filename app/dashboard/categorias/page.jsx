@@ -1,4 +1,3 @@
-
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -85,6 +84,7 @@ export default function Categorias() {
 
   const [panelActivo, setPanelActivo] = useState(null) // 'eleccion' | 'categoria' | 'tipo' | null
   const [categoriaEditandoId, setCategoriaEditandoId] = useState(null)
+  const [tipoEditandoId, setTipoEditandoId] = useState(null)
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: '', color: '#00E5FF', icono: '📦'
@@ -151,7 +151,14 @@ export default function Categorias() {
   }
 
   const abrirFormTipo = () => {
+    setTipoEditandoId(null)
     setFormTipo({ nombre: '', icono: '🗂️' })
+    setPanelActivo('tipo')
+  }
+
+  const abrirEditarTipo = (tipo) => {
+    setTipoEditandoId(tipo.id)
+    setFormTipo({ nombre: tipo.nombre, icono: tipo.icono || '🗂️' })
     setPanelActivo('tipo')
   }
 
@@ -189,18 +196,44 @@ export default function Categorias() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    const { error } = await supabase.from('tipos_categoria').insert({
-      user_id: user.id,
-      nombre: nombreLimpio,
-      icono: formTipo.icono || '🗂️'
-    })
+    if (tipoEditandoId) {
+      const tipoActual = tiposPersonalizados.find(t => t.id === tipoEditandoId)
+      const nombreViejo = tipoActual?.nombre
 
-    if (error) {
-      alert(error.code === '23505' ? 'Ya existe un tipo con ese nombre' : 'Error al guardar')
-      setLoading(false)
-      return
+      const { error } = await supabase.from('tipos_categoria').update({
+        nombre: nombreLimpio,
+        icono: formTipo.icono || '🗂️'
+      }).eq('id', tipoEditandoId)
+
+      if (error) {
+        alert(error.code === '23505' ? 'Ya existe un tipo con ese nombre' : 'Error al guardar')
+        setLoading(false)
+        return
+      }
+
+      // Si el nombre cambió, actualizamos también las categorías que
+      // pertenecían a ese tipo (están vinculadas por nombre, no por ID)
+      if (nombreViejo && nombreViejo !== nombreLimpio) {
+        await supabase.from('categorias')
+          .update({ tipo: nombreLimpio })
+          .eq('user_id', user.id)
+          .eq('tipo', nombreViejo)
+      }
+    } else {
+      const { error } = await supabase.from('tipos_categoria').insert({
+        user_id: user.id,
+        nombre: nombreLimpio,
+        icono: formTipo.icono || '🗂️'
+      })
+
+      if (error) {
+        alert(error.code === '23505' ? 'Ya existe un tipo con ese nombre' : 'Error al guardar')
+        setLoading(false)
+        return
+      }
     }
 
+    setTipoEditandoId(null)
     setPanelActivo(null)
     cargarTodo()
     setLoading(false)
@@ -353,7 +386,7 @@ export default function Categorias() {
         {/* Formulario: Nuevo tipo */}
         {panelActivo === 'tipo' && (
           <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-4 sm:p-6 mb-6">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">Nuevo tipo</h2>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">{tipoEditandoId ? 'Editar tipo' : 'Nuevo tipo'}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-[#8891B0] text-sm mb-1 block">Nombre del tipo</label>
@@ -375,10 +408,10 @@ export default function Categorias() {
                 disabled={loading}
                 className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
               >
-                {loading ? 'Guardando...' : 'Guardar'}
+                {loading ? 'Guardando...' : tipoEditandoId ? 'Guardar cambios' : 'Guardar'}
               </button>
               <button
-                onClick={() => setPanelActivo(null)}
+                onClick={() => { setPanelActivo(null); setTipoEditandoId(null) }}
                 className="bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition"
               >
                 Cancelar
@@ -406,6 +439,15 @@ export default function Categorias() {
                   >
                     + Nueva categoría
                   </button>
+                  {esTipoPersonalizado && (
+                    <button
+                      onClick={() => abrirEditarTipo(tiposPersonalizados.find(t => t.nombre === grupo.tipo))}
+                      className="text-[#5A6288] hover:text-[#00E5FF] transition text-sm px-1"
+                      title="Editar tipo"
+                    >
+                      ✏️
+                    </button>
+                  )}
                   {esTipoPersonalizado && tipoVacio && (
                     <button
                       onClick={() => eliminarTipo(tiposPersonalizados.find(t => t.nombre === grupo.tipo))}
