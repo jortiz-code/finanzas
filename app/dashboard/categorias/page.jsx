@@ -110,6 +110,7 @@ export default function Categorias() {
       .from('tipos_categoria')
       .select('*')
       .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
     setTiposPersonalizados(tipos || [])
   }
 
