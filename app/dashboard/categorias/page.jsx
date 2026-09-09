@@ -85,6 +85,8 @@ export default function Categorias() {
   const [panelActivo, setPanelActivo] = useState(null) // 'eleccion' | 'categoria' | 'tipo' | null
   const [categoriaEditandoId, setCategoriaEditandoId] = useState(null)
   const [tipoEditandoId, setTipoEditandoId] = useState(null)
+  const [tipoArrastrado, setTipoArrastrado] = useState(null)
+  const [tipoSobrevolado, setTipoSobrevolado] = useState(null)
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: '', color: '#00E5FF', icono: '📦'
@@ -109,6 +111,7 @@ export default function Categorias() {
     const { data: tipos } = await supabase
       .from('tipos_categoria')
       .select('*')
+      .order('orden', { ascending: true })
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
     setTiposPersonalizados(tipos || [])
@@ -255,6 +258,53 @@ export default function Categorias() {
     if (!confirm(`¿Eliminar el tipo "${tipo.nombre}"?`)) return
     await supabase.from('tipos_categoria').delete().eq('id', tipo.id)
     cargarTodo()
+  }
+
+  // --- Arrastrar y soltar para reordenar tipos (solo tipos con fila propia) ---
+
+  const manejarDragStart = (nombreTipo) => {
+    setTipoArrastrado(nombreTipo)
+  }
+
+  const manejarDragOver = (e, nombreTipo) => {
+    e.preventDefault()
+    if (nombreTipo !== tipoSobrevolado) setTipoSobrevolado(nombreTipo)
+  }
+
+  const manejarDragEnd = () => {
+    setTipoArrastrado(null)
+    setTipoSobrevolado(null)
+  }
+
+  const manejarDrop = async (nombreDestino) => {
+    if (!tipoArrastrado || tipoArrastrado === nombreDestino) {
+      setTipoArrastrado(null)
+      setTipoSobrevolado(null)
+      return
+    }
+
+    const ordenActual = [...tiposExistentes]
+    const indiceOrigen = ordenActual.indexOf(tipoArrastrado)
+    const indiceDestino = ordenActual.indexOf(nombreDestino)
+    if (indiceOrigen === -1 || indiceDestino === -1) return
+
+    ordenActual.splice(indiceOrigen, 1)
+    ordenActual.splice(indiceDestino, 0, tipoArrastrado)
+
+    // Actualiza la vista al instante, sin esperar al servidor
+    const nuevosTiposPersonalizados = ordenActual
+      .map(nombre => tiposPersonalizados.find(t => t.nombre === nombre))
+      .filter(Boolean)
+    setTiposPersonalizados(nuevosTiposPersonalizados)
+    setTipoArrastrado(null)
+    setTipoSobrevolado(null)
+
+    // Guarda el nuevo orden en Supabase
+    await Promise.all(
+      nuevosTiposPersonalizados.map((t, i) =>
+        supabase.from('tipos_categoria').update({ orden: i }).eq('id', t.id)
+      )
+    )
   }
 
   const categoriasPorTipo = tiposExistentes
@@ -427,9 +477,20 @@ export default function Categorias() {
           const tipoVacio = grupo.items.length === 0
 
           return (
-            <div key={grupo.tipo} className="mb-8">
+            <div
+              key={grupo.tipo}
+              className={`mb-8 rounded-2xl transition ${tipoSobrevolado === grupo.tipo && tipoArrastrado !== grupo.tipo ? 'ring-2 ring-[#7B61FF] ring-offset-2 ring-offset-[#0B0E1A]' : ''} ${tipoArrastrado === grupo.tipo ? 'opacity-40' : ''}`}
+              draggable={esTipoPersonalizado}
+              onDragStart={() => esTipoPersonalizado && manejarDragStart(grupo.tipo)}
+              onDragOver={(e) => esTipoPersonalizado && manejarDragOver(e, grupo.tipo)}
+              onDrop={() => esTipoPersonalizado && manejarDrop(grupo.tipo)}
+              onDragEnd={manejarDragEnd}
+            >
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg sm:text-xl font-semibold font-display capitalize flex items-center gap-2">
+                  {esTipoPersonalizado && (
+                    <span className="text-[#5A6288] cursor-grab active:cursor-grabbing select-none" title="Arrastra para reordenar">⠿</span>
+                  )}
                   {obtenerIconoTipo(grupo.tipo)} {grupo.tipo}
                   {tipoVacio && <span className="text-[#5A6288] text-xs font-normal font-mono">(sin categorías)</span>}
                 </h2>
