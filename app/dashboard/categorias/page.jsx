@@ -88,6 +88,7 @@ export default function Categorias() {
   const [tipoArrastrado, setTipoArrastrado] = useState(null)
   const [tipoSobrevolado, setTipoSobrevolado] = useState(null)
   const [categoriaArrastrada, setCategoriaArrastrada] = useState(null)
+  const categoriaArrastradaRef = useRef(null) // espejo sincrónico
   const [categoriasPreview, setCategoriasPreview] = useState(null) // null = no se está arrastrando
   const huboDropValido = useRef(false)
   const categoriasOriginal = useRef(null) // snapshot inmutable tomado al empezar a arrastrar
@@ -117,6 +118,7 @@ export default function Categorias() {
   useEffect(() => {
     const limpiarEstadoArrastre = () => {
       setCategoriaArrastrada(null)
+      categoriaArrastradaRef.current = null
       setCategoriasPreview(null)
       categoriasPreviewRef.current = null
       huboDropValido.current = false
@@ -338,23 +340,24 @@ export default function Categorias() {
     )
   }
 
-  // --- Arrastrar y soltar para categorías: reordenar y mover entre tipos ---
+  // --- Arrastrar y soltar para categorías, controlado con eventos de mouse ---
+  // (no usamos la API nativa de drag-and-drop del navegador: es propensa a
+  // perder la referencia del elemento cuando React lo reordena a mitad de
+  // camino. Con mousedown/mousemove/mouseup controlamos todo nosotros.)
 
-  const manejarDragStartCategoria = (catId) => {
+  const iniciarArrastreCategoria = (e, catId) => {
+    e.preventDefault()
+    categoriaArrastradaRef.current = catId
     setCategoriaArrastrada(catId)
-    categoriasOriginal.current = categorias // snapshot fijo, no se toca hasta soltar
+    categoriasOriginal.current = categorias
     categoriasPreviewRef.current = null
     setCategoriasPreview(null)
-    huboDropValido.current = false
   }
 
-  // Calcula, en un solo paso y siempre desde el estado ORIGINAL (no desde
-  // la vista previa anterior), cómo se vería intercambiar "origenId" con
-  // "destinoId" (y opcionalmente cambiar de tipo). Al calcular siempre
-  // desde el original, pasar por varias categorías no deja "rastro" — cada
-  // vista previa es limpia e independiente de las anteriores. Al
-  // intercambiar (en vez de insertar-y-desplazar), solo esas dos tarjetas
-  // cambian de lugar, sin saltos raros en una grilla.
+  // Calcula, siempre desde el estado ORIGINAL (no desde la vista previa
+  // anterior), cómo se vería intercambiar "origenId" con "destinoId" (o
+  // moverlo a "nuevoTipo" si no hay destino puntual). Calcular siempre
+  // desde el original evita que pasar por varias categorías deje rastro.
   const calcularPreviewDesdeOriginal = (origenId, destinoId, nuevoTipo) => {
     const base = categoriasOriginal.current || categorias
     const indiceOrigen = base.findIndex(c => c.id === origenId)
@@ -363,8 +366,6 @@ export default function Categorias() {
     const origenItem = { ...base[indiceOrigen], tipo: nuevoTipo ?? base[indiceOrigen].tipo }
 
     if (!destinoId) {
-      // Se movió a un tipo vacío, sin categoría destino puntual: solo se
-      // saca del original y se agrega al final del tipo destino.
       const lista = [...base]
       lista.splice(indiceOrigen, 1)
       lista.push(origenItem)
@@ -380,69 +381,84 @@ export default function Categorias() {
     return lista
   }
 
-  const manejarDragOverCategoria = (e, catDestino) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
+  // Mira qué hay bajo el mouse en este momento (usando las coordenadas de
+  // pantalla), identificando tarjetas de categoría o grupos de tipo
+  // mediante atributos data-* puestos en el JSX.
+  const obtenerDestinoBajoMouse = (x, y) => {
+    const el = document.elementFromPoint(x, y)
+    if (!el) return null
 
-    const base = categoriasOriginal.current || categorias
-    const origen = base.find(c => c.id === categoriaArrastrada)
-    if (!origen) return
+    const catEl = el.closest('[data-cat-id]')
+    if (catEl) {
+      const catId = catEl.getAttribute('data-cat-id')
+      if (catId === categoriaArrastradaRef.current) return null
+      return { tipo: 'categoria', catId, catTipo: catEl.getAttribute('data-cat-tipo') }
+    }
 
-    // Evitamos aplicar el cambio de TIPO mientras solo estás pasando por
-    // encima — eso obliga a React a reconstruir la tarjeta a mitad del
-    // arrastre nativo del navegador, y se pierde la conexión para poder
-    // confirmar el "soltar" después. El cambio de tipo se aplica recién
-    // en el drop real (manejarDropEnCategoria).
-    if (origen.tipo !== catDestino.tipo) return
+    const grupoEl = el.closest('[data-tipo-grupo]')
+    if (grupoEl) {
+      return { tipo: 'grupo', nombreTipo: grupoEl.getAttribute('data-tipo-grupo') }
+    }
 
-    actualizarPreview(
-      calcularPreviewDesdeOriginal(categoriaArrastrada, catDestino.id, origen.tipo)
-    )
+    return null
   }
 
-  const manejarDropEnCategoria = (e, catDestino) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
-    huboDropValido.current = true
-    actualizarPreview(
-      calcularPreviewDesdeOriginal(categoriaArrastrada, catDestino.id, catDestino.tipo)
-    )
-  }
+  useEffect(() => {
+    const manejarMouseMove = (e) => {
+      if (!categoriaArrastradaRef.current) return
 
-  const manejarDropEnGrupoVacio = (e, tipoDestino) => {
-    e.preventDefault()
-    if (!categoriaArrastrada) return
-    huboDropValido.current = true
-    actualizarPreview(
-      calcularPreviewDesdeOriginal(categoriaArrastrada, null, tipoDestino)
-    )
-  }
+      const destino = obtenerDestinoBajoMouse(e.clientX, e.clientY)
+      if (!destino) return
 
-  const manejarDragEndCategoria = async () => {
-    const seSoltoEnLugarValido = huboDropValido.current
-    const listaPreview = categoriasPreviewRef.current // ref: siempre al día, a diferencia del estado
+      if (destino.tipo === 'categoria') {
+        actualizarPreview(
+          calcularPreviewDesdeOriginal(categoriaArrastradaRef.current, destino.catId, destino.catTipo)
+        )
+      } else if (destino.tipo === 'grupo') {
+        actualizarPreview(
+          calcularPreviewDesdeOriginal(categoriaArrastradaRef.current, null, destino.nombreTipo)
+        )
+      }
+    }
 
-    setCategoriaArrastrada(null)
-    setCategoriasPreview(null)
-    categoriasPreviewRef.current = null
-    huboDropValido.current = false
-    categoriasOriginal.current = null
+    const manejarMouseUp = async (e) => {
+      if (!categoriaArrastradaRef.current) return
 
-    // Si no soltaste en un lugar válido, no confirmamos nada — todo vuelve
-    // a como estaba (dejamos de usar la previsualización, que era la única
-    // que mostraba el cambio).
-    if (!seSoltoEnLugarValido || !listaPreview) return
+      const idArrastrado = categoriaArrastradaRef.current
+      const destino = obtenerDestinoBajoMouse(e.clientX, e.clientY)
 
-    setCategorias(listaPreview)
+      let listaFinal = null
+      if (destino?.tipo === 'categoria') {
+        listaFinal = calcularPreviewDesdeOriginal(idArrastrado, destino.catId, destino.catTipo)
+      } else if (destino?.tipo === 'grupo') {
+        listaFinal = calcularPreviewDesdeOriginal(idArrastrado, null, destino.nombreTipo)
+      }
 
-    await Promise.all(
-      listaPreview.map((c, i) =>
-        supabase.from('categorias').update({ tipo: c.tipo, orden: i }).eq('id', c.id)
+      // Limpiamos el estado de arrastre pase lo que pase
+      categoriaArrastradaRef.current = null
+      setCategoriaArrastrada(null)
+      categoriasPreviewRef.current = null
+      setCategoriasPreview(null)
+      categoriasOriginal.current = null
+
+      // Si no soltaste sobre un lugar válido, no se confirma nada
+      if (!listaFinal) return
+
+      setCategorias(listaFinal)
+      await Promise.all(
+        listaFinal.map((c, i) =>
+          supabase.from('categorias').update({ tipo: c.tipo, orden: i }).eq('id', c.id)
+        )
       )
-    )
-  }
+    }
+
+    window.addEventListener('mousemove', manejarMouseMove)
+    window.addEventListener('mouseup', manejarMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', manejarMouseMove)
+      window.removeEventListener('mouseup', manejarMouseUp)
+    }
+  }, [categorias])
 
   // Mientras se arrastra, se muestra la previsualización; si no, los datos reales
   const categoriasVisibles = categoriasPreview || categorias
@@ -670,9 +686,8 @@ export default function Categorias() {
 
               {tipoVacio ? (
                 <div
+                  data-tipo-grupo={grupo.tipo}
                   className="bg-[#131829]/50 border border-dashed border-[#262E4A] rounded-2xl p-6 text-center"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => manejarDropEnGrupoVacio(e, grupo.tipo)}
                 >
                   <p className="text-[#5A6288] text-sm">Aún no tienes categorías en "{grupo.tipo}"</p>
                   {categoriaArrastrada && (
@@ -681,19 +696,16 @@ export default function Categorias() {
                 </div>
               ) : (
                 <div
+                  data-tipo-grupo={grupo.tipo}
                   className="grid grid-cols-2 md:grid-cols-4 gap-3"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => manejarDropEnGrupoVacio(e, grupo.tipo)}
                 >
                   {grupo.items.map(cat => (
                     <div
                       key={cat.id}
-                      draggable
-                      onDragStart={(e) => { e.stopPropagation(); manejarDragStartCategoria(cat.id) }}
-                      onDragOver={(e) => manejarDragOverCategoria(e, cat)}
-                      onDragEnd={(e) => { e.stopPropagation(); manejarDragEndCategoria() }}
-                      onDrop={(e) => manejarDropEnCategoria(e, cat)}
-                      className={`bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A] cursor-grab active:cursor-grabbing transition-all duration-200 ${categoriaArrastrada === cat.id ? 'opacity-40 scale-[0.97]' : ''}`}
+                      data-cat-id={cat.id}
+                      data-cat-tipo={cat.tipo}
+                      onMouseDown={(e) => iniciarArrastreCategoria(e, cat.id)}
+                      className={`bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A] cursor-grab active:cursor-grabbing select-none transition-all duration-200 ${categoriaArrastrada === cat.id ? 'opacity-40 scale-[0.97]' : ''}`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-[#5A6288] text-xs select-none">⠿</span>
@@ -708,6 +720,7 @@ export default function Categorias() {
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
+                          onMouseDown={(e) => e.stopPropagation()}
                           onClick={() => abrirEditarCategoria(cat)}
                           className="text-[#5A6288] hover:text-[#00E5FF] transition text-sm px-1"
                           title="Editar categoría"
@@ -715,6 +728,7 @@ export default function Categorias() {
                           ✏️
                         </button>
                         <button
+                          onMouseDown={(e) => e.stopPropagation()}
                           onClick={() => eliminarCategoria(cat)}
                           className="text-[#5A6288] hover:text-[#FF2E9A] transition"
                         >
