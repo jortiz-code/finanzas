@@ -260,7 +260,7 @@ export default function Categorias() {
     cargarTodo()
   }
 
-  // --- Arrastrar y soltar para reordenar tipos (solo tipos con fila propia) ---
+  // --- Arrastrar y soltar para reordenar tipos (en vivo, estilo Notion) ---
 
   const manejarDragStart = (nombreTipo) => {
     setTipoArrastrado(nombreTipo)
@@ -268,40 +268,35 @@ export default function Categorias() {
 
   const manejarDragOver = (e, nombreTipo) => {
     e.preventDefault()
-    if (nombreTipo !== tipoSobrevolado) setTipoSobrevolado(nombreTipo)
+    if (!tipoArrastrado || tipoArrastrado === nombreTipo) return
+
+    setTipoSobrevolado(nombreTipo)
+
+    // Reordena en vivo: mueve el tipo arrastrado a la posición actual del
+    // que está sobrevolando, para que los demás bloques se acomoden solos
+    // antes de soltar el mouse.
+    setTiposPersonalizados(prev => {
+      const nombres = prev.map(t => t.nombre)
+      const indiceOrigen = nombres.indexOf(tipoArrastrado)
+      const indiceDestino = nombres.indexOf(nombreTipo)
+      if (indiceOrigen === -1 || indiceDestino === -1 || indiceOrigen === indiceDestino) return prev
+
+      const nuevaLista = [...prev]
+      const [item] = nuevaLista.splice(indiceOrigen, 1)
+      nuevaLista.splice(indiceDestino, 0, item)
+      return nuevaLista
+    })
   }
 
-  const manejarDragEnd = () => {
-    setTipoArrastrado(null)
-    setTipoSobrevolado(null)
-  }
-
-  const manejarDrop = async (nombreDestino) => {
-    if (!tipoArrastrado || tipoArrastrado === nombreDestino) {
-      setTipoArrastrado(null)
-      setTipoSobrevolado(null)
-      return
-    }
-
-    const ordenActual = [...tiposExistentes]
-    const indiceOrigen = ordenActual.indexOf(tipoArrastrado)
-    const indiceDestino = ordenActual.indexOf(nombreDestino)
-    if (indiceOrigen === -1 || indiceDestino === -1) return
-
-    ordenActual.splice(indiceOrigen, 1)
-    ordenActual.splice(indiceDestino, 0, tipoArrastrado)
-
-    // Actualiza la vista al instante, sin esperar al servidor
-    const nuevosTiposPersonalizados = ordenActual
-      .map(nombre => tiposPersonalizados.find(t => t.nombre === nombre))
-      .filter(Boolean)
-    setTiposPersonalizados(nuevosTiposPersonalizados)
+  const manejarDragEnd = async () => {
+    // Al soltar, el arreglo ya refleja el orden final (se fue actualizando
+    // en vivo durante el arrastre) — solo falta guardarlo en Supabase.
+    const listaFinal = tiposPersonalizados
     setTipoArrastrado(null)
     setTipoSobrevolado(null)
 
-    // Guarda el nuevo orden en Supabase
     await Promise.all(
-      nuevosTiposPersonalizados.map((t, i) =>
+      listaFinal.map((t, i) =>
         supabase.from('tipos_categoria').update({ orden: i }).eq('id', t.id)
       )
     )
@@ -479,11 +474,11 @@ export default function Categorias() {
           return (
             <div
               key={grupo.tipo}
-              className={`mb-8 rounded-2xl transition ${tipoSobrevolado === grupo.tipo && tipoArrastrado !== grupo.tipo ? 'ring-2 ring-[#7B61FF] ring-offset-2 ring-offset-[#0B0E1A]' : ''} ${tipoArrastrado === grupo.tipo ? 'opacity-40' : ''}`}
+              className={`mb-8 rounded-2xl transition-all duration-300 ease-out ${tipoArrastrado === grupo.tipo ? 'opacity-40 scale-[0.98]' : ''}`}
               draggable={esTipoPersonalizado}
               onDragStart={() => esTipoPersonalizado && manejarDragStart(grupo.tipo)}
               onDragOver={(e) => esTipoPersonalizado && manejarDragOver(e, grupo.tipo)}
-              onDrop={() => esTipoPersonalizado && manejarDrop(grupo.tipo)}
+              onDrop={(e) => e.preventDefault()}
               onDragEnd={manejarDragEnd}
             >
               <div className="flex justify-between items-center mb-4">
