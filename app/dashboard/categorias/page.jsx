@@ -388,46 +388,49 @@ export default function Categorias() {
 
         {/* Panel de elección: ¿categoría o tipo? */}
         {panelActivo === 'eleccion' && (
-          <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-4 sm:p-6 mb-6">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">¿Qué quieres agregar?</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-body">
+            <div className="bg-[#131829] border border-[#262E4A] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl glow-violeta">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">¿Qué quieres agregar?</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  onClick={abrirFormCategoria}
+                  className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#00E5FF] rounded-2xl p-5 text-left transition group"
+                >
+                  <p className="text-3xl mb-2">🏷️</p>
+                  <p className="font-semibold font-display group-hover:text-[#00E5FF] transition">Nueva categoría</p>
+                  <p className="text-[#8891B0] text-sm mt-1">Ej: Gimnasio, Mascotas, Netflix</p>
+                </button>
+                <button
+                  onClick={abrirFormTipo}
+                  className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#7B61FF] rounded-2xl p-5 text-left transition group"
+                >
+                  <p className="text-3xl mb-2">📂</p>
+                  <p className="font-semibold font-display group-hover:text-[#7B61FF] transition">Nuevo tipo</p>
+                  <p className="text-[#8891B0] text-sm mt-1">Ej: Inversiones, Familiar, Ahorro</p>
+                </button>
+              </div>
               <button
-                onClick={abrirFormCategoria}
-                className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#00E5FF] rounded-2xl p-5 text-left transition group"
+                onClick={() => setPanelActivo(null)}
+                className="mt-4 text-[#8891B0] hover:text-white text-sm transition"
               >
-                <p className="text-3xl mb-2">🏷️</p>
-                <p className="font-semibold font-display group-hover:text-[#00E5FF] transition">Nueva categoría</p>
-                <p className="text-[#8891B0] text-sm mt-1">Ej: Gimnasio, Mascotas, Netflix</p>
-              </button>
-              <button
-                onClick={abrirFormTipo}
-                className="bg-[#0B0E1A] border border-[#262E4A] hover:border-[#7B61FF] rounded-2xl p-5 text-left transition group"
-              >
-                <p className="text-3xl mb-2">📂</p>
-                <p className="font-semibold font-display group-hover:text-[#7B61FF] transition">Nuevo tipo</p>
-                <p className="text-[#8891B0] text-sm mt-1">Ej: Inversiones, Familiar, Ahorro</p>
+                Cancelar
               </button>
             </div>
-            <button
-              onClick={() => setPanelActivo(null)}
-              className="mt-4 text-[#8891B0] hover:text-white text-sm transition"
-            >
-              Cancelar
-            </button>
           </div>
         )}
 
         {/* Formulario: Nueva categoría */}
         {panelActivo === 'categoria' && (
-          <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-4 sm:p-6 mb-6">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">{categoriaEditandoId ? 'Editar categoría' : 'Nueva categoría'}</h2>
-            {tiposExistentes.length === 0 ? (
-              <div className="bg-[#0B0E1A] border border-dashed border-[#262E4A] rounded-xl p-4 text-center">
-                <p className="text-[#8891B0] text-sm">Primero necesitas crear un tipo.</p>
-                <button onClick={abrirFormTipo} className="mt-2 text-[#7B61FF] hover:underline text-sm">Crear tipo →</button>
-              </div>
-            ) : (
-              <>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-body">
+            <div className="bg-[#131829] border border-[#262E4A] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto glow-violeta">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">{categoriaEditandoId ? 'Editar categoría' : 'Nueva categoría'}</h2>
+              {tiposExistentes.length === 0 ? (
+                <div className="bg-[#0B0E1A] border border-dashed border-[#262E4A] rounded-xl p-4 text-center">
+                  <p className="text-[#8891B0] text-sm">Primero necesitas crear un tipo.</p>
+                  <button onClick={abrirFormTipo} className="mt-2 text-[#7B61FF] hover:underline text-sm">Crear tipo →</button>
+                </div>
+              ) : (
+                <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[#8891B0] text-sm mb-1 block">Nombre</label>
@@ -474,49 +477,52 @@ export default function Categorias() {
                   </button>
                 </div>
               </>
-            )}
-            <button
-              onClick={() => { setPanelActivo(null); setCategoriaEditandoId(null) }}
-              className="mt-4 bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition"
-            >
-              Cancelar
-            </button>
+              )}
+              <button
+                onClick={() => { setPanelActivo(null); setCategoriaEditandoId(null) }}
+                className="mt-4 bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         )}
 
         {/* Formulario: Nuevo tipo */}
         {panelActivo === 'tipo' && (
-          <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-4 sm:p-6 mb-6">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">{tipoEditandoId ? 'Editar tipo' : 'Nuevo tipo'}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-[#8891B0] text-sm mb-1 block">Nombre del tipo</label>
-                <input
-                  placeholder="Ej: Inversiones"
-                  value={formTipo.nombre}
-                  onChange={e => setFormTipo({...formTipo, nombre: e.target.value})}
-                  className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
-                />
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-body">
+            <div className="bg-[#131829] border border-[#262E4A] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto glow-violeta">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4 font-display">{tipoEditandoId ? 'Editar tipo' : 'Nuevo tipo'}</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Nombre del tipo</label>
+                  <input
+                    placeholder="Ej: Inversiones"
+                    value={formTipo.nombre}
+                    onChange={e => setFormTipo({...formTipo, nombre: e.target.value})}
+                    className="w-full bg-[#0B0E1A] text-white rounded-xl px-4 py-3 outline-none border border-[#262E4A] focus:border-[#7B61FF] focus:ring-1 focus:ring-[#7B61FF] transition text-base"
+                  />
+                </div>
+                <div>
+                  <label className="text-[#8891B0] text-sm mb-1 block">Ícono</label>
+                  <SelectorIcono valor={formTipo.icono} onSeleccionar={(icono) => setFormTipo({...formTipo, icono})} />
+                </div>
               </div>
-              <div>
-                <label className="text-[#8891B0] text-sm mb-1 block">Ícono</label>
-                <SelectorIcono valor={formTipo.icono} onSeleccionar={(icono) => setFormTipo({...formTipo, icono})} />
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={guardarTipo}
+                  disabled={loading}
+                  className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
+                >
+                  {loading ? 'Guardando...' : tipoEditandoId ? 'Guardar cambios' : 'Guardar'}
+                </button>
+                <button
+                  onClick={() => { setPanelActivo(null); setTipoEditandoId(null) }}
+                  className="bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition"
+                >
+                  Cancelar
+                </button>
               </div>
-            </div>
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={guardarTipo}
-                disabled={loading}
-                className="bg-[#7B61FF] hover:bg-[#8f79ff] disabled:opacity-50 px-6 py-2 rounded-xl transition glow-violeta"
-              >
-                {loading ? 'Guardando...' : tipoEditandoId ? 'Guardar cambios' : 'Guardar'}
-              </button>
-              <button
-                onClick={() => { setPanelActivo(null); setTipoEditandoId(null) }}
-                className="bg-[#0B0E1A] hover:bg-[#1B2138] border border-[#262E4A] px-6 py-2 rounded-xl transition"
-              >
-                Cancelar
-              </button>
             </div>
           </div>
         )}
