@@ -599,9 +599,9 @@ export default function Categorias() {
                     <div
                       key={cat.id}
                       draggable
-                      onDragStart={() => manejarDragStartCategoria(cat.id)}
+                      onDragStart={(e) => { e.stopPropagation(); manejarDragStartCategoria(cat.id) }}
                       onDragOver={(e) => manejarDragOverCategoria(e, cat)}
-                      onDragEnd={manejarDragEndCategoria}
+                      onDragEnd={(e) => { e.stopPropagation(); manejarDragEndCategoria() }}
                       onDrop={(e) => { e.preventDefault(); e.stopPropagation() }}
                       className={`bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A] cursor-grab active:cursor-grabbing transition-all duration-200 ${categoriaArrastrada === cat.id ? 'opacity-40 scale-[0.97]' : ''}`}
                     >
