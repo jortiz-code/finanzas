@@ -334,10 +334,14 @@ export default function Categorias() {
     if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
 
     setCategorias(prev => {
-      const lista = [...prev]
-      const indiceOrigen = lista.findIndex(c => c.id === categoriaArrastrada)
-      if (indiceOrigen === -1) return prev
-      const origen = lista[indiceOrigen]
+      // Calculamos AMBOS índices sobre el arreglo original, antes de mover
+      // nada — recalcular el destino después de sacar el origen es lo que
+      // causaba el bug (no cambiaba con 1 puesto, saltaba con 2).
+      const indiceOrigen = prev.findIndex(c => c.id === categoriaArrastrada)
+      const indiceDestino = prev.findIndex(c => c.id === catDestino.id)
+      if (indiceOrigen === -1 || indiceDestino === -1 || indiceOrigen === indiceDestino) return prev
+
+      const origen = prev[indiceOrigen]
 
       // Solo reordenamos en vivo mientras el mouse pasa por encima si es
       // el MISMO tipo — mover de tipo durante el hover hace que React
@@ -345,9 +349,14 @@ export default function Categorias() {
       // referencia para avisar que soltaste (queda "pegada" en opaca).
       if (origen.tipo !== catDestino.tipo) return prev
 
-      const [item] = lista.splice(indiceOrigen, 1)
-      const indiceDestino = lista.findIndex(c => c.id === catDestino.id)
-      lista.splice(indiceDestino === -1 ? lista.length : indiceDestino, 0, item)
+      // Intercambiamos posiciones (A y B se cambian el lugar entre sí) en
+      // vez de insertar-y-desplazar. En una lista simple ambos enfoques se
+      // ven iguales, pero en una GRILLA insertar-y-desplazar corre en
+      // cadena a todos los elementos siguientes, haciendo que salten de
+      // fila/columna de forma impredecible ("diagonal"). Intercambiar
+      // asegura que solo estas dos tarjetas cambian de lugar.
+      const lista = [...prev]
+      ;[lista[indiceOrigen], lista[indiceDestino]] = [lista[indiceDestino], lista[indiceOrigen]]
       return lista
     })
   }
@@ -360,13 +369,14 @@ export default function Categorias() {
     if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
 
     setCategorias(prev => {
+      const indiceOrigen = prev.findIndex(c => c.id === categoriaArrastrada)
+      const indiceDestino = prev.findIndex(c => c.id === catDestino.id)
+      if (indiceOrigen === -1 || indiceDestino === -1) return prev
+
       const lista = [...prev]
-      const indiceOrigen = lista.findIndex(c => c.id === categoriaArrastrada)
-      if (indiceOrigen === -1) return prev
       const [item] = lista.splice(indiceOrigen, 1)
       item.tipo = catDestino.tipo
-      const indiceDestino = lista.findIndex(c => c.id === catDestino.id)
-      lista.splice(indiceDestino === -1 ? lista.length : indiceDestino, 0, item)
+      lista.splice(indiceDestino, 0, item)
       return lista
     })
   }
