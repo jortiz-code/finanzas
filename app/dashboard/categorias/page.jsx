@@ -338,28 +338,34 @@ export default function Categorias() {
   }
 
   // Calcula, en un solo paso y siempre desde el estado ORIGINAL (no desde
-  // la vista previa anterior), cómo se vería mover "origenId" hasta la
-  // posición de "destinoId" (y opcionalmente a otro tipo). Al calcular
-  // siempre desde el original, pasar por varias categorías no deja
-  // "rastro" — cada vista previa es limpia e independiente de las
-  // anteriores, y si vuelves a pasar por la misma, se ve igual que la
-  // primera vez.
+  // la vista previa anterior), cómo se vería intercambiar "origenId" con
+  // "destinoId" (y opcionalmente cambiar de tipo). Al calcular siempre
+  // desde el original, pasar por varias categorías no deja "rastro" — cada
+  // vista previa es limpia e independiente de las anteriores. Al
+  // intercambiar (en vez de insertar-y-desplazar), solo esas dos tarjetas
+  // cambian de lugar, sin saltos raros en una grilla.
   const calcularPreviewDesdeOriginal = (origenId, destinoId, nuevoTipo) => {
     const base = categoriasOriginal.current || categorias
     const indiceOrigen = base.findIndex(c => c.id === origenId)
     if (indiceOrigen === -1) return base
 
-    const lista = [...base]
-    const [item] = lista.splice(indiceOrigen, 1)
-    const itemCopia = { ...item, tipo: nuevoTipo ?? item.tipo }
+    const origenItem = { ...base[indiceOrigen], tipo: nuevoTipo ?? base[indiceOrigen].tipo }
 
     if (!destinoId) {
-      lista.push(itemCopia) // se movió a un tipo vacío, sin destino puntual
+      // Se movió a un tipo vacío, sin categoría destino puntual: solo se
+      // saca del original y se agrega al final del tipo destino.
+      const lista = [...base]
+      lista.splice(indiceOrigen, 1)
+      lista.push(origenItem)
       return lista
     }
 
-    const indiceDestino = lista.findIndex(c => c.id === destinoId)
-    lista.splice(indiceDestino === -1 ? lista.length : indiceDestino, 0, itemCopia)
+    const indiceDestino = base.findIndex(c => c.id === destinoId)
+    if (indiceDestino === -1) return base
+
+    const lista = [...base]
+    lista[indiceOrigen] = base[indiceDestino]
+    lista[indiceDestino] = origenItem
     return lista
   }
 
