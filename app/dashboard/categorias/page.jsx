@@ -87,6 +87,7 @@ export default function Categorias() {
   const [tipoEditandoId, setTipoEditandoId] = useState(null)
   const [tipoArrastrado, setTipoArrastrado] = useState(null)
   const [tipoSobrevolado, setTipoSobrevolado] = useState(null)
+  const [categoriaArrastrada, setCategoriaArrastrada] = useState(null)
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: '', color: '#00E5FF', icono: '📦'
@@ -104,8 +105,9 @@ export default function Categorias() {
     const { data: cats } = await supabase
       .from('categorias')
       .select('*')
-      .order('tipo', { ascending: true })
-      .order('nombre', { ascending: true })
+      .order('orden', { ascending: true })
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
     setCategorias(cats || [])
 
     const { data: tipos } = await supabase
@@ -298,6 +300,59 @@ export default function Categorias() {
     await Promise.all(
       listaFinal.map((t, i) =>
         supabase.from('tipos_categoria').update({ orden: i }).eq('id', t.id)
+      )
+    )
+  }
+
+  // --- Arrastrar y soltar para categorías: reordenar y mover entre tipos ---
+
+  const manejarDragStartCategoria = (catId) => {
+    setCategoriaArrastrada(catId)
+  }
+
+  const manejarDragOverCategoria = (e, catDestino) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
+
+    setCategorias(prev => {
+      const lista = [...prev]
+      const indiceOrigen = lista.findIndex(c => c.id === categoriaArrastrada)
+      if (indiceOrigen === -1) return prev
+
+      const [item] = lista.splice(indiceOrigen, 1)
+      // Si se suelta sobre una categoría de otro tipo, se recategoriza sola
+      if (item.tipo !== catDestino.tipo) {
+        item.tipo = catDestino.tipo
+      }
+      const indiceDestino = lista.findIndex(c => c.id === catDestino.id)
+      lista.splice(indiceDestino === -1 ? lista.length : indiceDestino, 0, item)
+      return lista
+    })
+  }
+
+  const manejarDropEnGrupoVacio = (e, tipoDestino) => {
+    e.preventDefault()
+    if (!categoriaArrastrada) return
+
+    setCategorias(prev => {
+      const lista = [...prev]
+      const indiceOrigen = lista.findIndex(c => c.id === categoriaArrastrada)
+      if (indiceOrigen === -1) return prev
+      const [item] = lista.splice(indiceOrigen, 1)
+      item.tipo = tipoDestino
+      lista.push(item)
+      return lista
+    })
+  }
+
+  const manejarDragEndCategoria = async () => {
+    const listaFinal = categorias
+    setCategoriaArrastrada(null)
+
+    await Promise.all(
+      listaFinal.map((c, i) =>
+        supabase.from('categorias').update({ tipo: c.tipo, orden: i }).eq('id', c.id)
       )
     )
   }
@@ -518,17 +573,34 @@ export default function Categorias() {
               </div>
 
               {tipoVacio ? (
-                <div className="bg-[#131829]/50 border border-dashed border-[#262E4A] rounded-2xl p-6 text-center">
+                <div
+                  className="bg-[#131829]/50 border border-dashed border-[#262E4A] rounded-2xl p-6 text-center"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => manejarDropEnGrupoVacio(e, grupo.tipo)}
+                >
                   <p className="text-[#5A6288] text-sm">Aún no tienes categorías en "{grupo.tipo}"</p>
+                  {categoriaArrastrada && (
+                    <p className="text-[#7B61FF] text-xs mt-1">Suelta aquí para mover a este tipo</p>
+                  )}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div
+                  className="grid grid-cols-2 md:grid-cols-4 gap-3"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => manejarDropEnGrupoVacio(e, grupo.tipo)}
+                >
                   {grupo.items.map(cat => (
                     <div
                       key={cat.id}
-                      className="bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A]"
+                      draggable
+                      onDragStart={() => manejarDragStartCategoria(cat.id)}
+                      onDragOver={(e) => manejarDragOverCategoria(e, cat)}
+                      onDragEnd={manejarDragEndCategoria}
+                      onDrop={(e) => { e.preventDefault(); e.stopPropagation() }}
+                      className={`bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A] cursor-grab active:cursor-grabbing transition-all duration-200 ${categoriaArrastrada === cat.id ? 'opacity-40 scale-[0.97]' : ''}`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[#5A6288] text-xs select-none">⠿</span>
                         <span className="text-2xl flex-shrink-0">{cat.icono}</span>
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate font-display">{cat.nombre}</p>
