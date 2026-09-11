@@ -374,8 +374,19 @@ export default function Categorias() {
     e.stopPropagation()
     if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
 
+    const base = categoriasOriginal.current || categorias
+    const origen = base.find(c => c.id === categoriaArrastrada)
+    if (!origen) return
+
+    // Evitamos aplicar el cambio de TIPO mientras solo estás pasando por
+    // encima — eso obliga a React a reconstruir la tarjeta a mitad del
+    // arrastre nativo del navegador, y se pierde la conexión para poder
+    // confirmar el "soltar" después. El cambio de tipo se aplica recién
+    // en el drop real (manejarDropEnCategoria).
+    if (origen.tipo !== catDestino.tipo) return
+
     setCategoriasPreview(
-      calcularPreviewDesdeOriginal(categoriaArrastrada, catDestino.id, catDestino.tipo)
+      calcularPreviewDesdeOriginal(categoriaArrastrada, catDestino.id, origen.tipo)
     )
   }
 
