@@ -631,7 +631,7 @@ export default function Categorias() {
                 </div>
               ) : (
                 <div
-                  className="space-y-2"
+                  className="grid grid-cols-2 md:grid-cols-4 gap-3"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => manejarDropEnGrupoVacio(e, grupo.tipo)}
                 >
@@ -643,7 +643,7 @@ export default function Categorias() {
                       onDragOver={(e) => manejarDragOverCategoria(e, cat)}
                       onDragEnd={(e) => { e.stopPropagation(); manejarDragEndCategoria() }}
                       onDrop={(e) => manejarDropEnCategoria(e, cat)}
-                      className={`bg-[#131829] rounded-2xl p-3 sm:p-4 flex justify-between items-center border border-[#262E4A] cursor-grab active:cursor-grabbing transition-all duration-200 ${categoriaArrastrada === cat.id ? 'opacity-40 scale-[0.98]' : ''}`}
+                      className={`bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A] cursor-grab active:cursor-grabbing transition-all duration-200 ${categoriaArrastrada === cat.id ? 'opacity-40 scale-[0.97]' : ''}`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-[#5A6288] text-xs select-none">⠿</span>
