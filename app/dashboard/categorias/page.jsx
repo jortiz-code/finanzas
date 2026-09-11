@@ -90,6 +90,7 @@ export default function Categorias() {
   const [categoriaArrastrada, setCategoriaArrastrada] = useState(null)
   const [categoriasPreview, setCategoriasPreview] = useState(null) // null = no se está arrastrando
   const huboDropValido = useRef(false)
+  const categoriasOriginal = useRef(null) // snapshot inmutable tomado al empezar a arrastrar
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: '', color: '#00E5FF', icono: '📦'
@@ -108,6 +109,8 @@ export default function Categorias() {
     const limpiarEstadoArrastre = () => {
       setCategoriaArrastrada(null)
       setCategoriasPreview(null)
+      huboDropValido.current = false
+      categoriasOriginal.current = null
       setTipoArrastrado(null)
       setTipoSobrevolado(null)
     }
@@ -329,8 +332,35 @@ export default function Categorias() {
 
   const manejarDragStartCategoria = (catId) => {
     setCategoriaArrastrada(catId)
-    setCategoriasPreview(categorias) // copia de trabajo, solo visual por ahora
+    categoriasOriginal.current = categorias // snapshot fijo, no se toca hasta soltar
+    setCategoriasPreview(null)
     huboDropValido.current = false
+  }
+
+  // Calcula, en un solo paso y siempre desde el estado ORIGINAL (no desde
+  // la vista previa anterior), cómo se vería mover "origenId" hasta la
+  // posición de "destinoId" (y opcionalmente a otro tipo). Al calcular
+  // siempre desde el original, pasar por varias categorías no deja
+  // "rastro" — cada vista previa es limpia e independiente de las
+  // anteriores, y si vuelves a pasar por la misma, se ve igual que la
+  // primera vez.
+  const calcularPreviewDesdeOriginal = (origenId, destinoId, nuevoTipo) => {
+    const base = categoriasOriginal.current || categorias
+    const indiceOrigen = base.findIndex(c => c.id === origenId)
+    if (indiceOrigen === -1) return base
+
+    const lista = [...base]
+    const [item] = lista.splice(indiceOrigen, 1)
+    const itemCopia = { ...item, tipo: nuevoTipo ?? item.tipo }
+
+    if (!destinoId) {
+      lista.push(itemCopia) // se movió a un tipo vacío, sin destino puntual
+      return lista
+    }
+
+    const indiceDestino = lista.findIndex(c => c.id === destinoId)
+    lista.splice(indiceDestino === -1 ? lista.length : indiceDestino, 0, itemCopia)
+    return lista
   }
 
   const manejarDragOverCategoria = (e, catDestino) => {
@@ -338,64 +368,28 @@ export default function Categorias() {
     e.stopPropagation()
     if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
 
-    setCategoriasPreview(prev => {
-      const base = prev || categorias
-      const indiceOrigen = base.findIndex(c => c.id === categoriaArrastrada)
-      const indiceDestino = base.findIndex(c => c.id === catDestino.id)
-      if (indiceOrigen === -1 || indiceDestino === -1 || indiceOrigen === indiceDestino) return base
-
-      const origen = base[indiceOrigen]
-      // Solo mostramos la vista previa en vivo si es el mismo tipo — mover
-      // de tipo durante el hover haría que la tarjeta se desmonte a mitad
-      // del arrastre.
-      if (origen.tipo !== catDestino.tipo) return base
-
-      // Intercambiamos posiciones (A y B se cambian el lugar) en vez de
-      // insertar-y-desplazar, para que en una grilla el movimiento sea
-      // predecible y no salte en diagonal.
-      const lista = [...base]
-      ;[lista[indiceOrigen], lista[indiceDestino]] = [lista[indiceDestino], lista[indiceOrigen]]
-      return lista
-    })
+    setCategoriasPreview(
+      calcularPreviewDesdeOriginal(categoriaArrastrada, catDestino.id, catDestino.tipo)
+    )
   }
 
-  // El cambio de TIPO también se aplica solo sobre la previsualización —
-  // recién se confirma de verdad en manejarDragEndCategoria.
   const manejarDropEnCategoria = (e, catDestino) => {
     e.preventDefault()
     e.stopPropagation()
     if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
     huboDropValido.current = true
-
-    setCategoriasPreview(prev => {
-      const base = prev || categorias
-      const indiceOrigen = base.findIndex(c => c.id === categoriaArrastrada)
-      const indiceDestino = base.findIndex(c => c.id === catDestino.id)
-      if (indiceOrigen === -1 || indiceDestino === -1) return base
-
-      const lista = [...base]
-      const [item] = lista.splice(indiceOrigen, 1)
-      item.tipo = catDestino.tipo
-      lista.splice(indiceDestino, 0, item)
-      return lista
-    })
+    setCategoriasPreview(
+      calcularPreviewDesdeOriginal(categoriaArrastrada, catDestino.id, catDestino.tipo)
+    )
   }
 
   const manejarDropEnGrupoVacio = (e, tipoDestino) => {
     e.preventDefault()
     if (!categoriaArrastrada) return
     huboDropValido.current = true
-
-    setCategoriasPreview(prev => {
-      const base = prev || categorias
-      const lista = [...base]
-      const indiceOrigen = lista.findIndex(c => c.id === categoriaArrastrada)
-      if (indiceOrigen === -1) return base
-      const [item] = lista.splice(indiceOrigen, 1)
-      item.tipo = tipoDestino
-      lista.push(item)
-      return lista
-    })
+    setCategoriasPreview(
+      calcularPreviewDesdeOriginal(categoriaArrastrada, null, tipoDestino)
+    )
   }
 
   const manejarDragEndCategoria = async () => {
@@ -405,9 +399,11 @@ export default function Categorias() {
     setCategoriaArrastrada(null)
     setCategoriasPreview(null)
     huboDropValido.current = false
+    categoriasOriginal.current = null
 
     // Si no soltaste en un lugar válido, no confirmamos nada — todo vuelve
-    // a como estaba (ya que dejamos de usar la previsualización).
+    // a como estaba (dejamos de usar la previsualización, que era la única
+    // que mostraba el cambio).
     if (!seSoltoEnLugarValido || !listaPreview) return
 
     setCategorias(listaPreview)
