@@ -98,6 +98,24 @@ export default function Categorias() {
     cargarTodo()
   }, [])
 
+  // Red de seguridad: si por algún motivo el navegador no dispara el evento
+  // de "terminar arrastre" sobre el elemento original (puede pasar si React
+  // lo desmonta a mitad de camino), esto limpia el estado igual para que
+  // nunca quede una tarjeta pegada en opaca.
+  useEffect(() => {
+    const limpiarEstadoArrastre = () => {
+      setCategoriaArrastrada(null)
+      setTipoArrastrado(null)
+      setTipoSobrevolado(null)
+    }
+    document.addEventListener('dragend', limpiarEstadoArrastre)
+    document.addEventListener('drop', limpiarEstadoArrastre)
+    return () => {
+      document.removeEventListener('dragend', limpiarEstadoArrastre)
+      document.removeEventListener('drop', limpiarEstadoArrastre)
+    }
+  }, [])
+
   const cargarTodo = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return window.location.href = '/auth'
@@ -319,12 +337,34 @@ export default function Categorias() {
       const lista = [...prev]
       const indiceOrigen = lista.findIndex(c => c.id === categoriaArrastrada)
       if (indiceOrigen === -1) return prev
+      const origen = lista[indiceOrigen]
+
+      // Solo reordenamos en vivo mientras el mouse pasa por encima si es
+      // el MISMO tipo — mover de tipo durante el hover hace que React
+      // desmonte la tarjeta a mitad del arrastre y el navegador pierde la
+      // referencia para avisar que soltaste (queda "pegada" en opaca).
+      if (origen.tipo !== catDestino.tipo) return prev
 
       const [item] = lista.splice(indiceOrigen, 1)
-      // Si se suelta sobre una categoría de otro tipo, se recategoriza sola
-      if (item.tipo !== catDestino.tipo) {
-        item.tipo = catDestino.tipo
-      }
+      const indiceDestino = lista.findIndex(c => c.id === catDestino.id)
+      lista.splice(indiceDestino === -1 ? lista.length : indiceDestino, 0, item)
+      return lista
+    })
+  }
+
+  // El cambio de TIPO se aplica recién acá, al soltar sobre una categoría
+  // de otro tipo — así la tarjeta nunca se desmonta mientras arrastras.
+  const manejarDropEnCategoria = (e, catDestino) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
+
+    setCategorias(prev => {
+      const lista = [...prev]
+      const indiceOrigen = lista.findIndex(c => c.id === categoriaArrastrada)
+      if (indiceOrigen === -1) return prev
+      const [item] = lista.splice(indiceOrigen, 1)
+      item.tipo = catDestino.tipo
       const indiceDestino = lista.findIndex(c => c.id === catDestino.id)
       lista.splice(indiceDestino === -1 ? lista.length : indiceDestino, 0, item)
       return lista
@@ -602,7 +642,7 @@ export default function Categorias() {
                       onDragStart={(e) => { e.stopPropagation(); manejarDragStartCategoria(cat.id) }}
                       onDragOver={(e) => manejarDragOverCategoria(e, cat)}
                       onDragEnd={(e) => { e.stopPropagation(); manejarDragEndCategoria() }}
-                      onDrop={(e) => { e.preventDefault(); e.stopPropagation() }}
+                      onDrop={(e) => manejarDropEnCategoria(e, cat)}
                       className={`bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A] cursor-grab active:cursor-grabbing transition-all duration-200 ${categoriaArrastrada === cat.id ? 'opacity-40 scale-[0.97]' : ''}`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
