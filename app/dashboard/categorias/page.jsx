@@ -91,6 +91,15 @@ export default function Categorias() {
   const [categoriasPreview, setCategoriasPreview] = useState(null) // null = no se está arrastrando
   const huboDropValido = useRef(false)
   const categoriasOriginal = useRef(null) // snapshot inmutable tomado al empezar a arrastrar
+  const categoriasPreviewRef = useRef(null) // espejo sincrónico de categoriasPreview
+
+  // Actualiza el estado (para que React repinte) Y la referencia (para que
+  // el código pueda leer el valor más reciente al instante, sin esperar a
+  // que React termine de procesar el render).
+  const actualizarPreview = (nuevaLista) => {
+    categoriasPreviewRef.current = nuevaLista
+    setCategoriasPreview(nuevaLista)
+  }
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: '', color: '#00E5FF', icono: '📦'
@@ -109,6 +118,7 @@ export default function Categorias() {
     const limpiarEstadoArrastre = () => {
       setCategoriaArrastrada(null)
       setCategoriasPreview(null)
+      categoriasPreviewRef.current = null
       huboDropValido.current = false
       categoriasOriginal.current = null
       setTipoArrastrado(null)
@@ -333,6 +343,7 @@ export default function Categorias() {
   const manejarDragStartCategoria = (catId) => {
     setCategoriaArrastrada(catId)
     categoriasOriginal.current = categorias // snapshot fijo, no se toca hasta soltar
+    categoriasPreviewRef.current = null
     setCategoriasPreview(null)
     huboDropValido.current = false
   }
@@ -385,7 +396,7 @@ export default function Categorias() {
     // en el drop real (manejarDropEnCategoria).
     if (origen.tipo !== catDestino.tipo) return
 
-    setCategoriasPreview(
+    actualizarPreview(
       calcularPreviewDesdeOriginal(categoriaArrastrada, catDestino.id, origen.tipo)
     )
   }
@@ -395,7 +406,7 @@ export default function Categorias() {
     e.stopPropagation()
     if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
     huboDropValido.current = true
-    setCategoriasPreview(
+    actualizarPreview(
       calcularPreviewDesdeOriginal(categoriaArrastrada, catDestino.id, catDestino.tipo)
     )
   }
@@ -404,17 +415,18 @@ export default function Categorias() {
     e.preventDefault()
     if (!categoriaArrastrada) return
     huboDropValido.current = true
-    setCategoriasPreview(
+    actualizarPreview(
       calcularPreviewDesdeOriginal(categoriaArrastrada, null, tipoDestino)
     )
   }
 
   const manejarDragEndCategoria = async () => {
     const seSoltoEnLugarValido = huboDropValido.current
-    const listaPreview = categoriasPreview
+    const listaPreview = categoriasPreviewRef.current // ref: siempre al día, a diferencia del estado
 
     setCategoriaArrastrada(null)
     setCategoriasPreview(null)
+    categoriasPreviewRef.current = null
     huboDropValido.current = false
     categoriasOriginal.current = null
 
