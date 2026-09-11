@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const ICONOS_TIPO_DEFAULT = {
@@ -88,6 +88,8 @@ export default function Categorias() {
   const [tipoArrastrado, setTipoArrastrado] = useState(null)
   const [tipoSobrevolado, setTipoSobrevolado] = useState(null)
   const [categoriaArrastrada, setCategoriaArrastrada] = useState(null)
+  const [categoriasPreview, setCategoriasPreview] = useState(null) // null = no se está arrastrando
+  const huboDropValido = useRef(false)
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: '', color: '#00E5FF', icono: '📦'
@@ -105,6 +107,7 @@ export default function Categorias() {
   useEffect(() => {
     const limpiarEstadoArrastre = () => {
       setCategoriaArrastrada(null)
+      setCategoriasPreview(null)
       setTipoArrastrado(null)
       setTipoSobrevolado(null)
     }
@@ -326,6 +329,8 @@ export default function Categorias() {
 
   const manejarDragStartCategoria = (catId) => {
     setCategoriaArrastrada(catId)
+    setCategoriasPreview(categorias) // copia de trabajo, solo visual por ahora
+    huboDropValido.current = false
   }
 
   const manejarDragOverCategoria = (e, catDestino) => {
@@ -333,47 +338,42 @@ export default function Categorias() {
     e.stopPropagation()
     if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
 
-    setCategorias(prev => {
-      // Calculamos AMBOS índices sobre el arreglo original, antes de mover
-      // nada — recalcular el destino después de sacar el origen es lo que
-      // causaba el bug (no cambiaba con 1 puesto, saltaba con 2).
-      const indiceOrigen = prev.findIndex(c => c.id === categoriaArrastrada)
-      const indiceDestino = prev.findIndex(c => c.id === catDestino.id)
-      if (indiceOrigen === -1 || indiceDestino === -1 || indiceOrigen === indiceDestino) return prev
+    setCategoriasPreview(prev => {
+      const base = prev || categorias
+      const indiceOrigen = base.findIndex(c => c.id === categoriaArrastrada)
+      const indiceDestino = base.findIndex(c => c.id === catDestino.id)
+      if (indiceOrigen === -1 || indiceDestino === -1 || indiceOrigen === indiceDestino) return base
 
-      const origen = prev[indiceOrigen]
+      const origen = base[indiceOrigen]
+      // Solo mostramos la vista previa en vivo si es el mismo tipo — mover
+      // de tipo durante el hover haría que la tarjeta se desmonte a mitad
+      // del arrastre.
+      if (origen.tipo !== catDestino.tipo) return base
 
-      // Solo reordenamos en vivo mientras el mouse pasa por encima si es
-      // el MISMO tipo — mover de tipo durante el hover hace que React
-      // desmonte la tarjeta a mitad del arrastre y el navegador pierde la
-      // referencia para avisar que soltaste (queda "pegada" en opaca).
-      if (origen.tipo !== catDestino.tipo) return prev
-
-      // Intercambiamos posiciones (A y B se cambian el lugar entre sí) en
-      // vez de insertar-y-desplazar. En una lista simple ambos enfoques se
-      // ven iguales, pero en una GRILLA insertar-y-desplazar corre en
-      // cadena a todos los elementos siguientes, haciendo que salten de
-      // fila/columna de forma impredecible ("diagonal"). Intercambiar
-      // asegura que solo estas dos tarjetas cambian de lugar.
-      const lista = [...prev]
+      // Intercambiamos posiciones (A y B se cambian el lugar) en vez de
+      // insertar-y-desplazar, para que en una grilla el movimiento sea
+      // predecible y no salte en diagonal.
+      const lista = [...base]
       ;[lista[indiceOrigen], lista[indiceDestino]] = [lista[indiceDestino], lista[indiceOrigen]]
       return lista
     })
   }
 
-  // El cambio de TIPO se aplica recién acá, al soltar sobre una categoría
-  // de otro tipo — así la tarjeta nunca se desmonta mientras arrastras.
+  // El cambio de TIPO también se aplica solo sobre la previsualización —
+  // recién se confirma de verdad en manejarDragEndCategoria.
   const manejarDropEnCategoria = (e, catDestino) => {
     e.preventDefault()
     e.stopPropagation()
     if (!categoriaArrastrada || categoriaArrastrada === catDestino.id) return
+    huboDropValido.current = true
 
-    setCategorias(prev => {
-      const indiceOrigen = prev.findIndex(c => c.id === categoriaArrastrada)
-      const indiceDestino = prev.findIndex(c => c.id === catDestino.id)
-      if (indiceOrigen === -1 || indiceDestino === -1) return prev
+    setCategoriasPreview(prev => {
+      const base = prev || categorias
+      const indiceOrigen = base.findIndex(c => c.id === categoriaArrastrada)
+      const indiceDestino = base.findIndex(c => c.id === catDestino.id)
+      if (indiceOrigen === -1 || indiceDestino === -1) return base
 
-      const lista = [...prev]
+      const lista = [...base]
       const [item] = lista.splice(indiceOrigen, 1)
       item.tipo = catDestino.tipo
       lista.splice(indiceDestino, 0, item)
@@ -384,11 +384,13 @@ export default function Categorias() {
   const manejarDropEnGrupoVacio = (e, tipoDestino) => {
     e.preventDefault()
     if (!categoriaArrastrada) return
+    huboDropValido.current = true
 
-    setCategorias(prev => {
-      const lista = [...prev]
+    setCategoriasPreview(prev => {
+      const base = prev || categorias
+      const lista = [...base]
       const indiceOrigen = lista.findIndex(c => c.id === categoriaArrastrada)
-      if (indiceOrigen === -1) return prev
+      if (indiceOrigen === -1) return base
       const [item] = lista.splice(indiceOrigen, 1)
       item.tipo = tipoDestino
       lista.push(item)
@@ -397,18 +399,31 @@ export default function Categorias() {
   }
 
   const manejarDragEndCategoria = async () => {
-    const listaFinal = categorias
+    const seSoltoEnLugarValido = huboDropValido.current
+    const listaPreview = categoriasPreview
+
     setCategoriaArrastrada(null)
+    setCategoriasPreview(null)
+    huboDropValido.current = false
+
+    // Si no soltaste en un lugar válido, no confirmamos nada — todo vuelve
+    // a como estaba (ya que dejamos de usar la previsualización).
+    if (!seSoltoEnLugarValido || !listaPreview) return
+
+    setCategorias(listaPreview)
 
     await Promise.all(
-      listaFinal.map((c, i) =>
+      listaPreview.map((c, i) =>
         supabase.from('categorias').update({ tipo: c.tipo, orden: i }).eq('id', c.id)
       )
     )
   }
 
+  // Mientras se arrastra, se muestra la previsualización; si no, los datos reales
+  const categoriasVisibles = categoriasPreview || categorias
+
   const categoriasPorTipo = tiposExistentes
-    .map(tipo => ({ tipo, items: categorias.filter(c => c.tipo === tipo) }))
+    .map(tipo => ({ tipo, items: categoriasVisibles.filter(c => c.tipo === tipo) }))
 
   return (
     <div className="min-h-screen bg-[#0B0E1A] text-white p-4 sm:p-6 lg:p-8 font-body">
