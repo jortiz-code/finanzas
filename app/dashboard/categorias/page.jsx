@@ -1,6 +1,12 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+  DragOverlay, useDroppable
+} from '@dnd-kit/core'
+import { SortableContext, useSortable, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 const ICONOS_TIPO_DEFAULT = {
   personal: '👤',
@@ -77,6 +83,73 @@ function SelectorIcono({ valor, onSeleccionar }) {
   )
 }
 
+// Tarjeta de categoría arrastrable (dnd-kit)
+function CategoriaCard({ cat, onEditar, onEliminar }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: cat.id
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A] cursor-grab active:cursor-grabbing select-none touch-none ${isDragging ? 'opacity-30' : ''}`}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-[#5A6288] text-xs select-none">⠿</span>
+        <span className="text-2xl flex-shrink-0">{cat.icono}</span>
+        <div className="min-w-0">
+          <p className="font-medium text-sm truncate font-display">{cat.nombre}</p>
+          <div className="w-3 h-3 rounded-full mt-1" style={{ backgroundColor: cat.color }} />
+        </div>
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => onEditar(cat)}
+          className="text-[#5A6288] hover:text-[#00E5FF] transition text-sm px-1"
+          title="Editar categoría"
+        >
+          ✏️
+        </button>
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => onEliminar(cat)}
+          className="text-[#5A6288] hover:text-[#FF2E9A] transition"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Contenedor de cada tipo: además de ordenar sus propias tarjetas
+// (SortableContext), es en sí mismo una zona donde soltar (useDroppable),
+// para que puedas soltar una categoría en un tipo vacío o en el espacio
+// vacío de un tipo con pocas categorías.
+function ContenedorTipo({ tipo, items, children }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `grupo:${tipo}` })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`rounded-2xl transition-colors ${isOver ? 'bg-[#7B61FF]/5 ring-1 ring-[#7B61FF]/40' : ''}`}
+    >
+      <SortableContext items={items.map(c => c.id)} strategy={rectSortingStrategy}>
+        {children}
+      </SortableContext>
+    </div>
+  )
+}
+
 export default function Categorias() {
   const [categorias, setCategorias] = useState([])
   const [tiposPersonalizados, setTiposPersonalizados] = useState([])
@@ -87,12 +160,16 @@ export default function Categorias() {
   const [tipoEditandoId, setTipoEditandoId] = useState(null)
   const [tipoArrastrado, setTipoArrastrado] = useState(null)
   const [tipoSobrevolado, setTipoSobrevolado] = useState(null)
-  const [moviendoCategoriaId, setMoviendoCategoriaId] = useState(null) // feedback visual del selector
+  const [categoriaActivaId, setCategoriaActivaId] = useState(null) // para el DragOverlay
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: '', color: '#00E5FF', icono: '📦'
   })
   const [formTipo, setFormTipo] = useState({ nombre: '', icono: '🗂️' })
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  )
 
   useEffect(() => {
     cargarTodo()
@@ -233,8 +310,6 @@ export default function Categorias() {
         return
       }
 
-      // Si el nombre cambió, actualizamos también las categorías que
-      // pertenecían a ese tipo (están vinculadas por nombre, no por ID)
       if (nombreViejo && nombreViejo !== nombreLimpio) {
         await supabase.from('categorias')
           .update({ tipo: nombreLimpio })
@@ -278,7 +353,7 @@ export default function Categorias() {
     cargarTodo()
   }
 
-  // --- Arrastrar y soltar para reordenar tipos (en vivo, estilo Notion) ---
+  // --- Arrastrar y soltar para reordenar TIPOS (sigue igual que antes) ---
 
   const manejarDragStart = (nombreTipo) => {
     setTipoArrastrado(nombreTipo)
@@ -290,9 +365,6 @@ export default function Categorias() {
 
     setTipoSobrevolado(nombreTipo)
 
-    // Reordena en vivo: mueve el tipo arrastrado a la posición actual del
-    // que está sobrevolando, para que los demás bloques se acomoden solos
-    // antes de soltar el mouse.
     setTiposPersonalizados(prev => {
       const nombres = prev.map(t => t.nombre)
       const indiceOrigen = nombres.indexOf(tipoArrastrado)
@@ -307,8 +379,6 @@ export default function Categorias() {
   }
 
   const manejarDragEnd = async () => {
-    // Al soltar, el arreglo ya refleja el orden final (se fue actualizando
-    // en vivo durante el arrastre) — solo falta guardarlo en Supabase.
     const listaFinal = tiposPersonalizados
     setTipoArrastrado(null)
     setTipoSobrevolado(null)
@@ -320,26 +390,79 @@ export default function Categorias() {
     )
   }
 
-  // Mover una categoría a otro tipo: simple, directo, sin arrastrar nada.
-  const moverCategoriaATipo = async (cat, nuevoTipo) => {
-    if (nuevoTipo === cat.tipo) return
-    setMoviendoCategoriaId(cat.id)
+  // --- Arrastrar y soltar para CATEGORÍAS, con dnd-kit ---
 
-    const { error } = await supabase
-      .from('categorias')
-      .update({ tipo: nuevoTipo })
-      .eq('id', cat.id)
-
-    if (error) {
-      alert('Error al mover la categoría: ' + error.message)
-      setMoviendoCategoriaId(null)
-      return
-    }
-
-    await cargarTodo()
-    setMoviendoCategoriaId(null)
+  const handleDragStartCategoria = (event) => {
+    setCategoriaActivaId(event.active.id)
   }
 
+  // Mientras arrastras sobre una categoría de OTRO tipo (o el contenedor
+  // de otro tipo), la vamos moviendo de tipo en vivo para que se vea el
+  // cambio reflejado de inmediato.
+  const handleDragOverCategoria = (event) => {
+    const { active, over } = event
+    if (!over) return
+
+    const activeId = active.id
+    const overId = over.id
+    if (activeId === overId) return
+
+    const activo = categorias.find(c => c.id === activeId)
+    if (!activo) return
+
+    let tipoDestino
+    if (typeof overId === 'string' && overId.startsWith('grupo:')) {
+      tipoDestino = overId.replace('grupo:', '')
+    } else {
+      tipoDestino = categorias.find(c => c.id === overId)?.tipo
+    }
+
+    if (!tipoDestino || tipoDestino === activo.tipo) return
+
+    setCategorias(prev => prev.map(c => c.id === activeId ? { ...c, tipo: tipoDestino } : c))
+  }
+
+  const handleDragEndCategoria = async (event) => {
+    const { active, over } = event
+    setCategoriaActivaId(null)
+    if (!over) return
+
+    const activeId = active.id
+    const overId = over.id
+
+    let listaFinal = null
+
+    setCategorias(prev => {
+      let lista = [...prev]
+      const indiceActivo = lista.findIndex(c => c.id === activeId)
+      if (indiceActivo === -1) return prev
+
+      // Si soltaste sobre otra categoría (no sobre el contenedor vacío),
+      // además de mover de tipo (ya aplicado en dragOver), reordenamos su
+      // posición exacta dentro del arreglo.
+      if (!(typeof overId === 'string' && overId.startsWith('grupo:'))) {
+        const indiceDestino = lista.findIndex(c => c.id === overId)
+        if (indiceDestino !== -1 && indiceActivo !== indiceDestino) {
+          lista = arrayMove(lista, indiceActivo, indiceDestino)
+        }
+      }
+
+      listaFinal = lista
+      return lista
+    })
+
+    // Persistimos fuera del updater de setState, con la lista ya calculada
+    setTimeout(async () => {
+      if (!listaFinal) return
+      await Promise.all(
+        listaFinal.map((c, i) =>
+          supabase.from('categorias').update({ tipo: c.tipo, orden: i }).eq('id', c.id)
+        )
+      )
+    }, 0)
+  }
+
+  const categoriaActiva = categorias.find(c => c.id === categoriaActivaId)
   const categoriasPorTipo = tiposExistentes
     .map(tipo => ({ tipo, items: categorias.filter(c => c.tipo === tipo) }))
 
@@ -511,113 +634,95 @@ export default function Categorias() {
         )}
 
         {/* Categorías agrupadas por tipo (siempre se muestran todos los tipos) */}
-        {categoriasPorTipo.map(grupo => {
-          const esTipoPersonalizado = tiposPersonalizados.some(t => t.nombre === grupo.tipo)
-          const tipoVacio = grupo.items.length === 0
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStartCategoria}
+          onDragOver={handleDragOverCategoria}
+          onDragEnd={handleDragEndCategoria}
+        >
+          {categoriasPorTipo.map(grupo => {
+            const esTipoPersonalizado = tiposPersonalizados.some(t => t.nombre === grupo.tipo)
+            const tipoVacio = grupo.items.length === 0
 
-          return (
-            <div
-              key={grupo.tipo}
-              className={`mb-8 rounded-2xl transition-all duration-300 ease-out ${tipoArrastrado === grupo.tipo ? 'opacity-40 scale-[0.98]' : ''}`}
-              draggable={esTipoPersonalizado}
-              onDragStart={() => esTipoPersonalizado && manejarDragStart(grupo.tipo)}
-              onDragOver={(e) => esTipoPersonalizado && manejarDragOver(e, grupo.tipo)}
-              onDrop={(e) => e.preventDefault()}
-              onDragEnd={manejarDragEnd}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg sm:text-xl font-semibold font-display capitalize flex items-center gap-2">
-                  {esTipoPersonalizado && (
-                    <span className="text-[#5A6288] cursor-grab active:cursor-grabbing select-none" title="Arrastra para reordenar">⠿</span>
-                  )}
-                  {obtenerIconoTipo(grupo.tipo)} {grupo.tipo}
-                  {tipoVacio && <span className="text-[#5A6288] text-xs font-normal font-mono">(sin categorías)</span>}
-                </h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => abrirFormCategoriaConTipo(grupo.tipo)}
-                    className="bg-[#131829] hover:bg-[#1B2138] border border-[#262E4A] hover:border-[#00E5FF] text-[#00E5FF] px-3 py-1.5 rounded-lg text-xs sm:text-sm transition whitespace-nowrap"
-                  >
-                    + Nueva categoría
-                  </button>
-                  {esTipoPersonalizado && (
+            return (
+              <div
+                key={grupo.tipo}
+                className={`mb-8 rounded-2xl transition-all duration-300 ease-out ${tipoArrastrado === grupo.tipo ? 'opacity-40 scale-[0.98]' : ''}`}
+                draggable={esTipoPersonalizado}
+                onDragStart={() => esTipoPersonalizado && manejarDragStart(grupo.tipo)}
+                onDragOver={(e) => esTipoPersonalizado && manejarDragOver(e, grupo.tipo)}
+                onDrop={(e) => e.preventDefault()}
+                onDragEnd={manejarDragEnd}
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg sm:text-xl font-semibold font-display capitalize flex items-center gap-2">
+                    {esTipoPersonalizado && (
+                      <span className="text-[#5A6288] cursor-grab active:cursor-grabbing select-none" title="Arrastra para reordenar">⠿</span>
+                    )}
+                    {obtenerIconoTipo(grupo.tipo)} {grupo.tipo}
+                    {tipoVacio && <span className="text-[#5A6288] text-xs font-normal font-mono">(sin categorías)</span>}
+                  </h2>
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => abrirEditarTipo(tiposPersonalizados.find(t => t.nombre === grupo.tipo))}
-                      className="text-[#5A6288] hover:text-[#00E5FF] transition text-sm px-1"
-                      title="Editar tipo"
+                      onClick={() => abrirFormCategoriaConTipo(grupo.tipo)}
+                      className="bg-[#131829] hover:bg-[#1B2138] border border-[#262E4A] hover:border-[#00E5FF] text-[#00E5FF] px-3 py-1.5 rounded-lg text-xs sm:text-sm transition whitespace-nowrap"
                     >
-                      ✏️
+                      + Nueva categoría
                     </button>
-                  )}
-                  {esTipoPersonalizado && tipoVacio && (
-                    <button
-                      onClick={() => eliminarTipo(tiposPersonalizados.find(t => t.nombre === grupo.tipo))}
-                      className="text-[#5A6288] hover:text-[#FF2E9A] transition text-sm px-1"
-                      title="Eliminar tipo"
-                    >
-                      🗑️
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {tipoVacio ? (
-                <div className="bg-[#131829]/50 border border-dashed border-[#262E4A] rounded-2xl p-6 text-center">
-                  <p className="text-[#5A6288] text-sm">Aún no tienes categorías en "{grupo.tipo}"</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {grupo.items.map(cat => (
-                    <div
-                      key={cat.id}
-                      className={`bg-[#131829] rounded-2xl p-4 flex flex-col gap-2 border border-[#262E4A] transition-opacity ${moviendoCategoriaId === cat.id ? 'opacity-50' : ''}`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-2xl flex-shrink-0">{cat.icono}</span>
-                          <div className="min-w-0">
-                            <p className="font-medium text-sm truncate font-display">{cat.nombre}</p>
-                            <div
-                              className="w-3 h-3 rounded-full mt-1"
-                              style={{ backgroundColor: cat.color }}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            onClick={() => abrirEditarCategoria(cat)}
-                            className="text-[#5A6288] hover:text-[#00E5FF] transition text-sm px-1"
-                            title="Editar categoría"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => eliminarCategoria(cat)}
-                            className="text-[#5A6288] hover:text-[#FF2E9A] transition"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-
-                      <select
-                        value={cat.tipo}
-                        onChange={(e) => moverCategoriaATipo(cat, e.target.value)}
-                        disabled={moviendoCategoriaId === cat.id}
-                        title="Mover a otro tipo"
-                        className="text-xs bg-[#0B0E1A] border border-[#262E4A] rounded-lg px-2 py-1.5 text-[#8891B0] focus:border-[#7B61FF] outline-none capitalize"
+                    {esTipoPersonalizado && (
+                      <button
+                        onClick={() => abrirEditarTipo(tiposPersonalizados.find(t => t.nombre === grupo.tipo))}
+                        className="text-[#5A6288] hover:text-[#00E5FF] transition text-sm px-1"
+                        title="Editar tipo"
                       >
-                        {tiposExistentes.map(t => (
-                          <option key={t} value={t}>↔ {t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                        ✏️
+                      </button>
+                    )}
+                    {esTipoPersonalizado && tipoVacio && (
+                      <button
+                        onClick={() => eliminarTipo(tiposPersonalizados.find(t => t.nombre === grupo.tipo))}
+                        className="text-[#5A6288] hover:text-[#FF2E9A] transition text-sm px-1"
+                        title="Eliminar tipo"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          )
-        })}
+
+                <ContenedorTipo tipo={grupo.tipo} items={grupo.items}>
+                  {tipoVacio ? (
+                    <div className="bg-[#131829]/50 border border-dashed border-[#262E4A] rounded-2xl p-6 text-center">
+                      <p className="text-[#5A6288] text-sm">Aún no tienes categorías en "{grupo.tipo}"</p>
+                      <p className="text-[#5A6288] text-xs mt-1">Arrastra una categoría aquí para moverla a este tipo</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {grupo.items.map(cat => (
+                        <CategoriaCard
+                          key={cat.id}
+                          cat={cat}
+                          onEditar={abrirEditarCategoria}
+                          onEliminar={eliminarCategoria}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </ContenedorTipo>
+              </div>
+            )
+          })}
+
+          <DragOverlay>
+            {categoriaActiva ? (
+              <div className="bg-[#131829] rounded-2xl p-4 flex items-center gap-2 border-2 border-[#7B61FF] shadow-2xl opacity-95">
+                <span className="text-2xl flex-shrink-0">{categoriaActiva.icono}</span>
+                <p className="font-medium text-sm font-display">{categoriaActiva.nombre}</p>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
 
         {tiposExistentes.length === 0 && !panelActivo && (
           <div className="bg-[#131829] border border-[#262E4A] rounded-2xl p-8 sm:p-12 text-center">
