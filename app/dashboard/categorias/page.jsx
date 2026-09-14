@@ -396,11 +396,16 @@ export default function Categorias() {
     setCategoriaActivaId(event.active.id)
   }
 
-  // Mientras arrastras sobre una categoría de OTRO tipo (o el contenedor
-  // de otro tipo), la vamos moviendo de tipo en vivo para que se vea el
-  // cambio reflejado de inmediato.
-  const handleDragOverCategoria = (event) => {
+  // Todo el cambio (tipo + posición) se aplica al soltar — no durante el
+  // hover. Actualizar el estado real en cada instante del arrastre generaba
+  // demasiados repintados y chocaba con la animación interna de dnd-kit
+  // (por eso se veía la sección opaca y las categorías se acomodaban solas
+  // sin haber soltado). La librería ya muestra su propia vista previa
+  // visual mientras arrastras, sin que nosotros toquemos el estado.
+
+  const handleDragEndCategoria = async (event) => {
     const { active, over } = event
+    setCategoriaActivaId(null)
     if (!over) return
 
     const activeId = active.id
@@ -411,38 +416,25 @@ export default function Categorias() {
     if (!activo) return
 
     let tipoDestino
+    let overCatId = null
     if (typeof overId === 'string' && overId.startsWith('grupo:')) {
       tipoDestino = overId.replace('grupo:', '')
     } else {
-      tipoDestino = categorias.find(c => c.id === overId)?.tipo
+      const overCat = categorias.find(c => c.id === overId)
+      tipoDestino = overCat?.tipo
+      overCatId = overId
     }
-
-    if (!tipoDestino || tipoDestino === activo.tipo) return
-
-    setCategorias(prev => prev.map(c => c.id === activeId ? { ...c, tipo: tipoDestino } : c))
-  }
-
-  const handleDragEndCategoria = async (event) => {
-    const { active, over } = event
-    setCategoriaActivaId(null)
-    if (!over) return
-
-    const activeId = active.id
-    const overId = over.id
+    if (!tipoDestino) return
 
     let listaFinal = null
 
     setCategorias(prev => {
-      let lista = [...prev]
-      const indiceActivo = lista.findIndex(c => c.id === activeId)
-      if (indiceActivo === -1) return prev
+      let lista = prev.map(c => c.id === activeId ? { ...c, tipo: tipoDestino } : c)
 
-      // Si soltaste sobre otra categoría (no sobre el contenedor vacío),
-      // además de mover de tipo (ya aplicado en dragOver), reordenamos su
-      // posición exacta dentro del arreglo.
-      if (!(typeof overId === 'string' && overId.startsWith('grupo:'))) {
-        const indiceDestino = lista.findIndex(c => c.id === overId)
-        if (indiceDestino !== -1 && indiceActivo !== indiceDestino) {
+      if (overCatId) {
+        const indiceActivo = lista.findIndex(c => c.id === activeId)
+        const indiceDestino = lista.findIndex(c => c.id === overCatId)
+        if (indiceActivo !== -1 && indiceDestino !== -1 && indiceActivo !== indiceDestino) {
           lista = arrayMove(lista, indiceActivo, indiceDestino)
         }
       }
@@ -638,7 +630,6 @@ export default function Categorias() {
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStartCategoria}
-          onDragOver={handleDragOverCategoria}
           onDragEnd={handleDragEndCategoria}
         >
           {categoriasPorTipo.map(grupo => {
