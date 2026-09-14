@@ -87,20 +87,7 @@ export default function Categorias() {
   const [tipoEditandoId, setTipoEditandoId] = useState(null)
   const [tipoArrastrado, setTipoArrastrado] = useState(null)
   const [tipoSobrevolado, setTipoSobrevolado] = useState(null)
-  const [categoriaArrastrada, setCategoriaArrastrada] = useState(null)
-  const categoriaArrastradaRef = useRef(null) // espejo sincrónico
-  const [categoriasPreview, setCategoriasPreview] = useState(null) // null = no se está arrastrando
-  const huboDropValido = useRef(false)
-  const categoriasOriginal = useRef(null) // snapshot inmutable tomado al empezar a arrastrar
-  const categoriasPreviewRef = useRef(null) // espejo sincrónico de categoriasPreview
-
-  // Actualiza el estado (para que React repinte) Y la referencia (para que
-  // el código pueda leer el valor más reciente al instante, sin esperar a
-  // que React termine de procesar el render).
-  const actualizarPreview = (nuevaLista) => {
-    categoriasPreviewRef.current = nuevaLista
-    setCategoriasPreview(nuevaLista)
-  }
+  const [moviendoCategoriaId, setMoviendoCategoriaId] = useState(null) // feedback visual del selector
 
   const [formCategoria, setFormCategoria] = useState({
     nombre: '', tipo: '', color: '#00E5FF', icono: '📦'
@@ -111,18 +98,11 @@ export default function Categorias() {
     cargarTodo()
   }, [])
 
-  // Red de seguridad: si por algún motivo el navegador no dispara el evento
-  // de "terminar arrastre" sobre el elemento original (puede pasar si React
-  // lo desmonta a mitad de camino), esto limpia el estado igual para que
-  // nunca quede una tarjeta pegada en opaca.
+  // Red de seguridad para el arrastre de TIPOS (sigue usando drag nativo,
+  // que en ese caso sí funciona bien): si el navegador no avisa que
+  // terminaste de arrastrar, esto limpia el estado igual.
   useEffect(() => {
     const limpiarEstadoArrastre = () => {
-      setCategoriaArrastrada(null)
-      categoriaArrastradaRef.current = null
-      setCategoriasPreview(null)
-      categoriasPreviewRef.current = null
-      huboDropValido.current = false
-      categoriasOriginal.current = null
       setTipoArrastrado(null)
       setTipoSobrevolado(null)
     }
@@ -340,131 +320,28 @@ export default function Categorias() {
     )
   }
 
-  // --- Arrastrar y soltar para categorías, controlado con eventos de mouse ---
-  // (no usamos la API nativa de drag-and-drop del navegador: es propensa a
-  // perder la referencia del elemento cuando React lo reordena a mitad de
-  // camino. Con mousedown/mousemove/mouseup controlamos todo nosotros.)
+  // Mover una categoría a otro tipo: simple, directo, sin arrastrar nada.
+  const moverCategoriaATipo = async (cat, nuevoTipo) => {
+    if (nuevoTipo === cat.tipo) return
+    setMoviendoCategoriaId(cat.id)
 
-  const iniciarArrastreCategoria = (e, catId) => {
-    e.preventDefault()
-    categoriaArrastradaRef.current = catId
-    setCategoriaArrastrada(catId)
-    categoriasOriginal.current = categorias
-    categoriasPreviewRef.current = null
-    setCategoriasPreview(null)
+    const { error } = await supabase
+      .from('categorias')
+      .update({ tipo: nuevoTipo })
+      .eq('id', cat.id)
+
+    if (error) {
+      alert('Error al mover la categoría: ' + error.message)
+      setMoviendoCategoriaId(null)
+      return
+    }
+
+    await cargarTodo()
+    setMoviendoCategoriaId(null)
   }
-
-  // Calcula, siempre desde el estado ORIGINAL (no desde la vista previa
-  // anterior), cómo se vería intercambiar "origenId" con "destinoId" (o
-  // moverlo a "nuevoTipo" si no hay destino puntual). Calcular siempre
-  // desde el original evita que pasar por varias categorías deje rastro.
-  const calcularPreviewDesdeOriginal = (origenId, destinoId, nuevoTipo) => {
-    const base = categoriasOriginal.current || categorias
-    const indiceOrigen = base.findIndex(c => c.id === origenId)
-    if (indiceOrigen === -1) return base
-
-    const origenItem = { ...base[indiceOrigen], tipo: nuevoTipo ?? base[indiceOrigen].tipo }
-
-    if (!destinoId) {
-      const lista = [...base]
-      lista.splice(indiceOrigen, 1)
-      lista.push(origenItem)
-      return lista
-    }
-
-    const indiceDestino = base.findIndex(c => c.id === destinoId)
-    if (indiceDestino === -1) return base
-
-    const lista = [...base]
-    lista[indiceOrigen] = base[indiceDestino]
-    lista[indiceDestino] = origenItem
-    return lista
-  }
-
-  // Mira qué hay bajo el mouse en este momento (usando las coordenadas de
-  // pantalla), identificando tarjetas de categoría o grupos de tipo
-  // mediante atributos data-* puestos en el JSX.
-  const obtenerDestinoBajoMouse = (x, y) => {
-    const el = document.elementFromPoint(x, y)
-    if (!el) return null
-
-    const catEl = el.closest('[data-cat-id]')
-    if (catEl) {
-      const catId = catEl.getAttribute('data-cat-id')
-      if (catId === categoriaArrastradaRef.current) return null
-      return { tipo: 'categoria', catId, catTipo: catEl.getAttribute('data-cat-tipo') }
-    }
-
-    const grupoEl = el.closest('[data-tipo-grupo]')
-    if (grupoEl) {
-      return { tipo: 'grupo', nombreTipo: grupoEl.getAttribute('data-tipo-grupo') }
-    }
-
-    return null
-  }
-
-  useEffect(() => {
-    const manejarMouseMove = (e) => {
-      if (!categoriaArrastradaRef.current) return
-
-      const destino = obtenerDestinoBajoMouse(e.clientX, e.clientY)
-      if (!destino) return
-
-      if (destino.tipo === 'categoria') {
-        actualizarPreview(
-          calcularPreviewDesdeOriginal(categoriaArrastradaRef.current, destino.catId, destino.catTipo)
-        )
-      } else if (destino.tipo === 'grupo') {
-        actualizarPreview(
-          calcularPreviewDesdeOriginal(categoriaArrastradaRef.current, null, destino.nombreTipo)
-        )
-      }
-    }
-
-    const manejarMouseUp = async (e) => {
-      if (!categoriaArrastradaRef.current) return
-
-      const idArrastrado = categoriaArrastradaRef.current
-      const destino = obtenerDestinoBajoMouse(e.clientX, e.clientY)
-
-      let listaFinal = null
-      if (destino?.tipo === 'categoria') {
-        listaFinal = calcularPreviewDesdeOriginal(idArrastrado, destino.catId, destino.catTipo)
-      } else if (destino?.tipo === 'grupo') {
-        listaFinal = calcularPreviewDesdeOriginal(idArrastrado, null, destino.nombreTipo)
-      }
-
-      // Limpiamos el estado de arrastre pase lo que pase
-      categoriaArrastradaRef.current = null
-      setCategoriaArrastrada(null)
-      categoriasPreviewRef.current = null
-      setCategoriasPreview(null)
-      categoriasOriginal.current = null
-
-      // Si no soltaste sobre un lugar válido, no se confirma nada
-      if (!listaFinal) return
-
-      setCategorias(listaFinal)
-      await Promise.all(
-        listaFinal.map((c, i) =>
-          supabase.from('categorias').update({ tipo: c.tipo, orden: i }).eq('id', c.id)
-        )
-      )
-    }
-
-    window.addEventListener('mousemove', manejarMouseMove)
-    window.addEventListener('mouseup', manejarMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', manejarMouseMove)
-      window.removeEventListener('mouseup', manejarMouseUp)
-    }
-  }, [categorias])
-
-  // Mientras se arrastra, se muestra la previsualización; si no, los datos reales
-  const categoriasVisibles = categoriasPreview || categorias
 
   const categoriasPorTipo = tiposExistentes
-    .map(tipo => ({ tipo, items: categoriasVisibles.filter(c => c.tipo === tipo) }))
+    .map(tipo => ({ tipo, items: categorias.filter(c => c.tipo === tipo) }))
 
   return (
     <div className="min-h-screen bg-[#0B0E1A] text-white p-4 sm:p-6 lg:p-8 font-body">
@@ -685,56 +562,55 @@ export default function Categorias() {
               </div>
 
               {tipoVacio ? (
-                <div
-                  data-tipo-grupo={grupo.tipo}
-                  className="bg-[#131829]/50 border border-dashed border-[#262E4A] rounded-2xl p-6 text-center"
-                >
+                <div className="bg-[#131829]/50 border border-dashed border-[#262E4A] rounded-2xl p-6 text-center">
                   <p className="text-[#5A6288] text-sm">Aún no tienes categorías en "{grupo.tipo}"</p>
-                  {categoriaArrastrada && (
-                    <p className="text-[#7B61FF] text-xs mt-1">Suelta aquí para mover a este tipo</p>
-                  )}
                 </div>
               ) : (
-                <div
-                  data-tipo-grupo={grupo.tipo}
-                  className="grid grid-cols-2 md:grid-cols-4 gap-3"
-                >
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {grupo.items.map(cat => (
                     <div
                       key={cat.id}
-                      data-cat-id={cat.id}
-                      data-cat-tipo={cat.tipo}
-                      onMouseDown={(e) => iniciarArrastreCategoria(e, cat.id)}
-                      className={`bg-[#131829] rounded-2xl p-4 flex justify-between items-center border border-[#262E4A] cursor-grab active:cursor-grabbing select-none transition-all duration-200 ${categoriaArrastrada === cat.id ? 'opacity-40 scale-[0.97]' : ''}`}
+                      className={`bg-[#131829] rounded-2xl p-4 flex flex-col gap-2 border border-[#262E4A] transition-opacity ${moviendoCategoriaId === cat.id ? 'opacity-50' : ''}`}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[#5A6288] text-xs select-none">⠿</span>
-                        <span className="text-2xl flex-shrink-0">{cat.icono}</span>
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate font-display">{cat.nombre}</p>
-                          <div
-                            className="w-3 h-3 rounded-full mt-1"
-                            style={{ backgroundColor: cat.color }}
-                          />
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-2xl flex-shrink-0">{cat.icono}</span>
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate font-display">{cat.nombre}</p>
+                            <div
+                              className="w-3 h-3 rounded-full mt-1"
+                              style={{ backgroundColor: cat.color }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => abrirEditarCategoria(cat)}
+                            className="text-[#5A6288] hover:text-[#00E5FF] transition text-sm px-1"
+                            title="Editar categoría"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => eliminarCategoria(cat)}
+                            className="text-[#5A6288] hover:text-[#FF2E9A] transition"
+                          >
+                            ×
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={() => abrirEditarCategoria(cat)}
-                          className="text-[#5A6288] hover:text-[#00E5FF] transition text-sm px-1"
-                          title="Editar categoría"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={() => eliminarCategoria(cat)}
-                          className="text-[#5A6288] hover:text-[#FF2E9A] transition"
-                        >
-                          ×
-                        </button>
-                      </div>
+
+                      <select
+                        value={cat.tipo}
+                        onChange={(e) => moverCategoriaATipo(cat, e.target.value)}
+                        disabled={moviendoCategoriaId === cat.id}
+                        title="Mover a otro tipo"
+                        className="text-xs bg-[#0B0E1A] border border-[#262E4A] rounded-lg px-2 py-1.5 text-[#8891B0] focus:border-[#7B61FF] outline-none capitalize"
+                      >
+                        {tiposExistentes.map(t => (
+                          <option key={t} value={t}>↔ {t}</option>
+                        ))}
+                      </select>
                     </div>
                   ))}
                 </div>
